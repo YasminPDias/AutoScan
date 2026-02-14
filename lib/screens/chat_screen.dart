@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../layouts/desktop_layout.dart';
+import '../utils/responsive.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -41,88 +43,100 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Diagnóstico'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Messages list
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[index];
-                return _buildMessageBubble(message);
-              },
-            ),
-          ),
-          
-          // Message input
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.cardWhite,
-              border: Border(
-                top: BorderSide(color: AppColors.border, width: 1),
-              ),
-            ),
-            child: SafeArea(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: AppColors.iconBackground,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: AppColors.border, width: 1),
-                      ),
-                      child: TextField(
-                        controller: _messageController,
-                        decoration: const InputDecoration(
-                          hintText: 'Escreva uma mensagem',
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
+    return DesktopLayout(
+      currentRoute: '/chat',
+      title: context.isDesktop ? 'Chat' : '',
+      showAppBar: !context.isDesktop,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: context.isDesktop
+            ? null
+            : AppBar(
+                title: const Text('Chat'),
+                actions: [
                   IconButton(
-                    icon: const Icon(Icons.mic_none),
+                    icon: const Icon(Icons.person_outline),
                     onPressed: () {},
-                    color: AppColors.textSecondary,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.send),
-                    onPressed: () {
-                      if (_messageController.text.isNotEmpty) {
-                        setState(() {
-                          _messages.add(ChatMessage(
-                            text: _messageController.text,
-                            isUser: true,
-                            timestamp: DateTime.now(),
-                          ));
-                          _messageController.clear();
-                        });
-                      }
-                    },
-                    color: AppColors.primaryRed,
                   ),
                 ],
               ),
+        body: Column(
+          children: [
+            // Messages list
+            Expanded(
+              child: ListView.builder(
+                padding: EdgeInsets.all(context.isDesktop ? 40 : 20),
+                itemCount: _messages.length,
+                itemBuilder: (context, index) {
+                  final message = _messages[index];
+                  return _buildMessageBubble(message);
+                },
+              ),
             ),
-          ),
-        ],
+            
+            // Message input
+            Container(
+              padding: EdgeInsets.all(context.isDesktop ? 24 : 16),
+              decoration: BoxDecoration(
+                color: AppColors.cardWhite,
+                border: Border(
+                  top: BorderSide(color: AppColors.border, width: 1),
+                ),
+              ),
+              child: SafeArea(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: context.isDesktop ? 1200 : double.infinity,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: AppColors.iconBackground,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: AppColors.border, width: 1),
+                          ),
+                          child: TextField(
+                            controller: _messageController,
+                            decoration: const InputDecoration(
+                              hintText: 'Escreva uma mensagem',
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.mic_none),
+                        onPressed: () {},
+                        color: AppColors.textSecondary,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.send),
+                        onPressed: () {
+                          if (_messageController.text.isNotEmpty) {
+                            setState(() {
+                              _messages.add(ChatMessage(
+                                text: _messageController.text,
+                                isUser: true,
+                                timestamp: DateTime.now(),
+                              ));
+                              _messageController.clear();
+                            });
+                          }
+                        },
+                        color: AppColors.primaryRed,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -171,8 +185,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (message.isHighlighted)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
                       child: Text(
                         'BarScan',
                         style: TextStyle(
@@ -184,7 +198,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   Text(
                     message.text,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textPrimary,
                       height: 1.4,
@@ -199,7 +213,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Container(
               width: 32,
               height: 32,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.primaryRed,
                 shape: BoxShape.circle,
               ),
