@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import '../utils/responsive.dart';
-import '../widgets/app_sidebar.dart';
-import '../widgets/app_drawer.dart';
+import '../widgets_defaults/app_sidebar.dart';
+import '../widgets_defaults/app_drawer.dart';
 
 class DesktopLayout extends StatelessWidget {
   final Widget child;
   final String currentRoute;
   final String title;
   final bool showAppBar;
-  
+
   const DesktopLayout({
     super.key,
     required this.child,
@@ -20,15 +20,11 @@ class DesktopLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (context.isDesktop) {
-      // Desktop layout with sidebar
       return Scaffold(
         backgroundColor: Colors.white,
         body: Row(
           children: [
-            // Fixed sidebar
             AppSidebar(currentRoute: currentRoute),
-            
-            // Main content area
             Expanded(
               child: Column(
                 children: [
@@ -63,7 +59,6 @@ class DesktopLayout extends StatelessWidget {
         ),
       );
     } else {
-      // Mobile layout with drawer (original)
       return Scaffold(
         appBar: showAppBar && title.isNotEmpty
             ? AppBar(

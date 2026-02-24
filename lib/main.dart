@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'theme/app_theme.dart';
-import 'screens/login_screen.dart';
-import 'screens/register_screen.dart';
-import 'screens/home_screen.dart';
-import 'screens/dashboard_screen.dart';
-import 'screens/profile_screen.dart';
-import 'screens/history_screen.dart';
-import 'screens/diagnostic_screen.dart';
-import 'screens/plans_screen.dart';
-import 'screens/chat_screen.dart';
+import 'screens/login/login_screen.dart';
+import 'screens/register/register_screen.dart';
+import 'screens/home/home_screen.dart';
+import 'screens/dashboard/dashboard_screen.dart';
+import 'screens/profile/profile_screen.dart';
+import 'screens/history/history_screen.dart';
+import 'screens/diagnostic/diagnostic_screen.dart';
+import 'screens/plans/plans_screen.dart';
+import 'screens/chat/chat_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const AutoScanApp());
 }
 

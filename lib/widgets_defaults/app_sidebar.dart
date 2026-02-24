@@ -1,13 +1,39 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../services/auth_storage.dart';
 
-class AppSidebar extends StatelessWidget {
+class AppSidebar extends StatefulWidget {
   final String currentRoute;
-  
+
   const AppSidebar({
     super.key,
     required this.currentRoute,
   });
+
+  @override
+  State<AppSidebar> createState() => _AppSidebarState();
+}
+
+class _AppSidebarState extends State<AppSidebar> {
+  String _userName = '';
+  String _userEmail = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final name = await AuthStorage.getUserName();
+    final email = await AuthStorage.getUserEmail();
+    if (mounted) {
+      setState(() {
+        _userName = name ?? 'Usuário';
+        _userEmail = email ?? '';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +47,6 @@ class AppSidebar extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Logo section
           Container(
             padding: const EdgeInsets.all(24),
             child: Row(
@@ -52,11 +77,8 @@ class AppSidebar extends StatelessWidget {
               ],
             ),
           ),
-          
           const Divider(height: 1),
           const SizedBox(height: 16),
-          
-          // Navigation items
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -116,8 +138,6 @@ class AppSidebar extends StatelessWidget {
               ],
             ),
           ),
-          
-          // User profile section at bottom
           const Divider(height: 1),
           Container(
             padding: const EdgeInsets.all(16),
@@ -133,39 +153,44 @@ class AppSidebar extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Yasmin Dias',
-                        style: TextStyle(
+                        _userName.isNotEmpty ? _userName : 'Usuário',
+                        style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textPrimary,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      Text(
-                        'Proprietário',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
+                      if (_userEmail.isNotEmpty)
+                        Text(
+                          _userEmail,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
                     ],
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.logout, size: 20),
                   color: AppColors.textSecondary,
-                  onPressed: () {
-                    Navigator.pushNamedAndRemoveUntil(
-                      context,
-                      '/login',
-                      (route) => false,
-                    );
+                  onPressed: () async {
+                    await AuthStorage.clear();
+                    if (context.mounted) {
+                      Navigator.pushNamedAndRemoveUntil(
+                        context,
+                        '/login',
+                        (route) => false,
+                      );
+                    }
                   },
                   tooltip: 'Sair',
                 ),
@@ -184,8 +209,8 @@ class AppSidebar extends StatelessWidget {
     required String label,
     required String route,
   }) {
-    final isActive = currentRoute == route;
-    
+    final isActive = widget.currentRoute == route;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Material(

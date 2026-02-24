@@ -1,18 +1,11 @@
 import 'package:flutter/material.dart';
 
-/// Breakpoints para diferentes tamanhos de tela
 class Breakpoints {
-  // Mobile: < 600px
   static const double mobile = 600;
-  
-  // Tablet: 600px - 1024px
   static const double tablet = 1024;
-  
-  // Desktop: > 1024px
   static const double desktop = 1024;
 }
 
-/// Classe auxiliar para layouts responsivos
 class ResponsiveLayout extends StatelessWidget {
   final Widget mobile;
   final Widget? tablet;
@@ -41,17 +34,16 @@ class ResponsiveLayout extends StatelessWidget {
   }
 }
 
-/// Extension para facilitar verificações de tamanho de tela
 extension ResponsiveExtension on BuildContext {
   bool get isMobile => MediaQuery.of(this).size.width < Breakpoints.mobile;
-  bool get isTablet => MediaQuery.of(this).size.width >= Breakpoints.mobile &&
+  bool get isTablet =>
+      MediaQuery.of(this).size.width >= Breakpoints.mobile &&
       MediaQuery.of(this).size.width < Breakpoints.desktop;
   bool get isDesktop => MediaQuery.of(this).size.width >= Breakpoints.desktop;
-  
+
   double get screenWidth => MediaQuery.of(this).size.width;
   double get screenHeight => MediaQuery.of(this).size.height;
-  
-  /// Retorna um valor baseado no tamanho da tela
+
   T responsive<T>({
     required T mobile,
     T? tablet,

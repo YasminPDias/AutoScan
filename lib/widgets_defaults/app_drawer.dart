@@ -9,7 +9,6 @@ class AppDrawer extends StatelessWidget {
     return Drawer(
       child: Column(
         children: [
-          // Header with user info
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
@@ -68,8 +67,6 @@ class AppDrawer extends StatelessWidget {
               ],
             ),
           ),
-          
-          // Menu items
           Expanded(
             child: ListView(
               padding: EdgeInsets.zero,
@@ -78,8 +75,7 @@ class AppDrawer extends StatelessWidget {
                   leading: const Icon(Icons.home),
                   title: const Text('Início'),
                   onTap: () {
-                    Navigator.pop(context); // Close drawer
-                    // If not already on home, navigate to home
+                    Navigator.pop(context);
                     Navigator.pushNamedAndRemoveUntil(
                       context,
                       '/home',
@@ -91,8 +87,7 @@ class AppDrawer extends StatelessWidget {
                   leading: const Icon(Icons.person),
                   title: const Text('Perfil'),
                   onTap: () {
-                    Navigator.pop(context); // Close drawer
-                    // Navigate to profile, replacing current route
+                    Navigator.pop(context);
                     Navigator.pushReplacementNamed(context, '/profile');
                   },
                 ),
@@ -100,8 +95,7 @@ class AppDrawer extends StatelessWidget {
                   leading: const Icon(Icons.dashboard),
                   title: const Text('Painel Administrativo'),
                   onTap: () {
-                    Navigator.pop(context); // Close drawer
-                    // Navigate to dashboard, replacing current route
+                    Navigator.pop(context);
                     Navigator.pushReplacementNamed(context, '/dashboard');
                   },
                 ),

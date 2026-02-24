@@ -1,11 +1,37 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../layouts/desktop_layout.dart';
-import '../utils/responsive.dart';
-import '../widgets/diagnostic_item.dart';
+import '../../theme/app_colors.dart';
+import '../../layouts/desktop_layout.dart';
+import '../../utils/responsive.dart';
+import '../../widgets_defaults/diagnostic_item.dart';
+import '../../services/auth_storage.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  String _userName = 'Usuário';
+  String _userEmail = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final name = await AuthStorage.getUserName();
+    final email = await AuthStorage.getUserEmail();
+    if (mounted) {
+      setState(() {
+        _userName = name ?? 'Usuário';
+        _userEmail = email ?? '';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,14 +48,12 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // Desktop: 2-column layout
   Widget _buildDesktopLayout(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(40),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Left column: Avatar and actions
           SizedBox(
             width: 300,
             child: Column(
@@ -49,18 +73,18 @@ class ProfileScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 24),
-                        const Text(
-                          'Yasmin Dias',
-                          style: TextStyle(
+                        Text(
+                          _userName,
+                          style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
                             color: AppColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          'yasmindias001@gmail.com',
-                          style: TextStyle(
+                        Text(
+                          _userEmail,
+                          style: const TextStyle(
                             fontSize: 14,
                             color: AppColors.textSecondary,
                           ),
@@ -79,12 +103,15 @@ class ProfileScreen extends StatelessWidget {
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton.icon(
-                            onPressed: () {
-                              Navigator.pushNamedAndRemoveUntil(
-                                context,
-                                '/login',
-                                (route) => false,
-                              );
+                            onPressed: () async {
+                              await AuthStorage.clear();
+                              if (context.mounted) {
+                                Navigator.pushNamedAndRemoveUntil(
+                                  context,
+                                  '/login',
+                                  (route) => false,
+                                );
+                              }
                             },
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.primaryRed,
@@ -104,15 +131,11 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
           ),
-          
           const SizedBox(width: 24),
-          
-          // Right column: Information and settings
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Account info
                 const Text(
                   'Informação da Conta',
                   style: TextStyle(
@@ -122,7 +145,6 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
                 Row(
                   children: [
                     Expanded(
@@ -153,10 +175,7 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                
                 const SizedBox(height: 32),
-                
-                // Recent history
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -177,7 +196,6 @@ class ProfileScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                
                 DiagnosticItem(
                   code: 'Código: P0301',
                   vehicle: 'Toyota Corolla 2020',
@@ -196,10 +214,7 @@ class ProfileScreen extends StatelessWidget {
                   date: '10/10/2026',
                   status: DiagnosticStatus.resolved,
                 ),
-                
                 const SizedBox(height: 32),
-                
-                // Account settings
                 const Text(
                   'Configurações da Conta',
                   style: TextStyle(
@@ -209,7 +224,6 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
                 _buildSettingItem(
                   icon: Icons.notifications,
                   title: 'Notificações',
@@ -245,12 +259,10 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // Mobile: Original vertical layout
   Widget _buildMobileLayout(BuildContext context) {
     return SingleChildScrollView(
       child: Column(
         children: [
-          // Header with user info
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(24),
@@ -291,18 +303,18 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Yasmin Dias',
-                  style: TextStyle(
+                Text(
+                  _userName,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'yasmindias001@gmail.com',
-                  style: TextStyle(
+                Text(
+                  _userEmail,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
                   ),
@@ -310,13 +322,11 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
           ),
-          
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Account info
                 const Text(
                   'Informação da Conta',
                   style: TextStyle(
@@ -326,7 +336,6 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
                 _buildInfoCard(
                   icon: Icons.business_center,
                   label: 'Tipo de Conta',
@@ -348,8 +357,6 @@ class ProfileScreen extends StatelessWidget {
                   valueColor: AppColors.primaryRed,
                 ),
                 const SizedBox(height: 24),
-                
-                // Recent history
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -376,7 +383,6 @@ class ProfileScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                
                 DiagnosticItem(
                   code: 'Código: P0301',
                   vehicle: 'Toyota Corolla 2020',
@@ -396,8 +402,6 @@ class ProfileScreen extends StatelessWidget {
                   status: DiagnosticStatus.resolved,
                 ),
                 const SizedBox(height: 24),
-                
-                // Account settings
                 const Text(
                   'Configurações da Conta',
                   style: TextStyle(
@@ -407,7 +411,6 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
                 _buildSettingItem(
                   icon: Icons.notifications,
                   title: 'Notificações',
@@ -436,17 +439,18 @@ class ProfileScreen extends StatelessWidget {
                   onTap: () {},
                 ),
                 const SizedBox(height: 24),
-                
-                // Logout button
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pushNamedAndRemoveUntil(
-                        context,
-                        '/login',
-                        (route) => false,
-                      );
+                    onPressed: () async {
+                      await AuthStorage.clear();
+                      if (context.mounted) {
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          '/login',
+                          (route) => false,
+                        );
+                      }
                     },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primaryRed,

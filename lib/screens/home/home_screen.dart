@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../layouts/desktop_layout.dart';
-import '../utils/responsive.dart';
-import '../widgets/feature_card.dart';
+import '../../theme/app_colors.dart';
+import '../../layouts/desktop_layout.dart';
+import '../../utils/responsive.dart';
+import '../../widgets_defaults/feature_card.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -25,12 +25,10 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // Desktop layout with enhanced design
   Widget _buildDesktopLayout(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Enhanced Hero Banner
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(56),
@@ -38,7 +36,7 @@ class HomeScreen extends StatelessWidget {
             gradient: const LinearGradient(
               colors: [
                 AppColors.primaryRed,
-                Color(0xFFB71C1C), // Darker red
+                Color(0xFFB71C1C),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -54,7 +52,6 @@ class HomeScreen extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // Icon with glassmorphism effect
               Container(
                 width: 140,
                 height: 140,
@@ -119,8 +116,6 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 48),
-        
-        // Section title
         Row(
           children: [
             Container(
@@ -143,8 +138,6 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 24),
-        
-        // Feature cards grid
         GridView.count(
           crossAxisCount: 3,
           shrinkWrap: true,
@@ -201,12 +194,10 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // Original simple mobile layout
   Widget _buildMobileLayout(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Red banner - centered content
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
@@ -256,8 +247,6 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 24),
-        
-        // Section title
         const Text(
           'Recursos Principais',
           style: TextStyle(
@@ -267,15 +256,12 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        
-        // Feature cards
         FeatureCard(
           icon: Icons.analytics_outlined,
           title: 'Diagnósticos Inteligente',
           description: 'Análise completa e precisa do seu veículo com tecnologia avançada',
           onTap: () => Navigator.pushNamed(context, '/diagnostic'),
         ),
-
         const SizedBox(height: 20),
         FeatureCard(
           icon: Icons.chat_bubble_outline,

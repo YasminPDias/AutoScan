@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../layouts/desktop_layout.dart';
-import '../utils/responsive.dart';
-import '../widgets/stat_card.dart';
-import '../widgets/diagnostic_item.dart';
+import '../../theme/app_colors.dart';
+import '../../layouts/desktop_layout.dart';
+import '../../utils/responsive.dart';
+import '../../widgets_defaults/stat_card.dart';
+import '../../widgets_defaults/diagnostic_item.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -21,7 +21,6 @@ class DashboardScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Overview section
               const Text(
                 '| Visão Geral',
                 style: TextStyle(
@@ -31,8 +30,6 @@ class DashboardScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              
-              // Stats grid - 4 columns on desktop, 2 on mobile
               GridView.count(
                 crossAxisCount: context.isDesktop ? 4 : 2,
                 shrinkWrap: true,
@@ -64,8 +61,6 @@ class DashboardScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 32),
-              
-              // Open cases section
               const Text(
                 '| Casos em Abertos',
                 style: TextStyle(
@@ -75,8 +70,6 @@ class DashboardScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              
-              // Cases list
               DiagnosticItem(
                 code: 'Código: P0301',
                 vehicle: 'Toyota Corolla 2020\nUsuário: Alisson Henrique',
@@ -99,8 +92,6 @@ class DashboardScreen extends StatelessWidget {
                 onTap: () {},
               ),
               const SizedBox(height: 32),
-              
-              // Diagnostic per day section
               const Text(
                 '| Diagnóstico por Dia',
                 style: TextStyle(
@@ -110,8 +101,6 @@ class DashboardScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              
-              // Simple bar chart representation
               _buildBarChart(),
             ],
           ),

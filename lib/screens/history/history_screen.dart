@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../layouts/desktop_layout.dart';
-import '../utils/responsive.dart';
-import '../widgets/diagnostic_item.dart';
+import '../../theme/app_colors.dart';
+import '../../layouts/desktop_layout.dart';
+import '../../utils/responsive.dart';
+import '../../widgets_defaults/diagnostic_item.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
@@ -42,7 +42,6 @@ class HistoryScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header with back button
               Row(
                 children: [
                   IconButton(
@@ -62,8 +61,6 @@ class HistoryScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 24),
-              
-              // Items in 2 columns on desktop, 1 column on mobile
               context.isDesktop
                   ? GridView.builder(
                       shrinkWrap: true,

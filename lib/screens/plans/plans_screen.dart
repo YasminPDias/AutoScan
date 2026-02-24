@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../layouts/desktop_layout.dart';
-import '../utils/responsive.dart';
+import '../../theme/app_colors.dart';
+import '../../layouts/desktop_layout.dart';
+import '../../utils/responsive.dart';
 
 class PlansScreen extends StatefulWidget {
   const PlansScreen({super.key});
@@ -11,7 +11,7 @@ class PlansScreen extends StatefulWidget {
 }
 
 class _PlansScreenState extends State<PlansScreen> {
-  int selectedPlan = 1; // 0: Basic, 1: Professional, 2: Enterprise
+  int selectedPlan = 1;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +26,6 @@ class _PlansScreenState extends State<PlansScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header section
               Center(
                 child: Column(
                   children: [
@@ -50,8 +49,6 @@ class _PlansScreenState extends State<PlansScreen> {
                 ),
               ),
               const SizedBox(height: 40),
-              
-              // Plans cards
               context.isDesktop
                   ? Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -173,7 +170,7 @@ class _PlansScreenState extends State<PlansScreen> {
     required bool isPopular,
   }) {
     final isSelected = selectedPlan == index;
-    
+
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -201,7 +198,6 @@ class _PlansScreenState extends State<PlansScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with popular badge
             if (isPopular)
               Container(
                 width: double.infinity,
@@ -223,13 +219,11 @@ class _PlansScreenState extends State<PlansScreen> {
                   ),
                 ),
               ),
-            
             Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Plan title
                   Text(
                     title,
                     style: const TextStyle(
@@ -239,8 +233,6 @@ class _PlansScreenState extends State<PlansScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
-                  // Price
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -265,8 +257,6 @@ class _PlansScreenState extends State<PlansScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
-                  
-                  // Features list
                   ...features.map((feature) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: Row(
@@ -290,8 +280,6 @@ class _PlansScreenState extends State<PlansScreen> {
                         ),
                       )),
                   const SizedBox(height: 24),
-                  
-                  // Select button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -301,12 +289,8 @@ class _PlansScreenState extends State<PlansScreen> {
                         });
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: isSelected
-                            ? AppColors.primaryRed
-                            : Colors.white,
-                        foregroundColor: isSelected
-                            ? Colors.white
-                            : AppColors.primaryRed,
+                        backgroundColor: isSelected ? AppColors.primaryRed : Colors.white,
+                        foregroundColor: isSelected ? Colors.white : AppColors.primaryRed,
                         side: BorderSide(
                           color: AppColors.primaryRed,
                           width: isSelected ? 0 : 2,

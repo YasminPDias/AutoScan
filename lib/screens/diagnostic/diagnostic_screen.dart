@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../layouts/desktop_layout.dart';
-import '../utils/responsive.dart';
-import '../widgets/custom_button.dart';
-import '../widgets/custom_text_field.dart';
+import '../../theme/app_colors.dart';
+import '../../layouts/desktop_layout.dart';
+import '../../utils/responsive.dart';
+import '../../widgets_defaults/custom_button.dart';
+import '../../widgets_defaults/custom_text_field.dart';
 
 class DiagnosticScreen extends StatefulWidget {
   const DiagnosticScreen({super.key});
@@ -54,7 +54,6 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header
         const Text(
           'Novo Diagnóstico',
           style: TextStyle(
@@ -64,12 +63,9 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
           ),
         ),
         const SizedBox(height: 32),
-        
-        // 2 Column Layout
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Left Column - Form
             Expanded(
               flex: 6,
               child: Column(
@@ -88,8 +84,6 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
               ),
             ),
             const SizedBox(width: 24),
-            
-            // Right Column - Preview & Tips
             Expanded(
               flex: 4,
               child: Column(
@@ -110,7 +104,6 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Info banner
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -131,14 +124,12 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
           ),
         ),
         const SizedBox(height: 24),
-        
         _buildCodeCard(),
         const SizedBox(height: 16),
         _buildVehicleCard(),
         const SizedBox(height: 16),
         _buildInfoCard(),
         const SizedBox(height: 24),
-        
         CustomButton(
           text: 'Gerar diagnóstico',
           onPressed: () {},
@@ -233,8 +224,6 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            
-            // Grid 2x2 for desktop
             context.isDesktop
                 ? Column(
                     children: [

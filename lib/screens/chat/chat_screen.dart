@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../layouts/desktop_layout.dart';
-import '../utils/responsive.dart';
+import '../../theme/app_colors.dart';
+import '../../layouts/desktop_layout.dart';
+import '../../utils/responsive.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -62,7 +62,6 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
         body: Column(
           children: [
-            // Messages list
             Expanded(
               child: ListView.builder(
                 padding: EdgeInsets.all(context.isDesktop ? 40 : 20),
@@ -73,8 +72,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 },
               ),
             ),
-            
-            // Message input
             Container(
               padding: EdgeInsets.all(context.isDesktop ? 24 : 16),
               decoration: BoxDecoration(
