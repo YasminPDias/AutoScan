@@ -1,21 +1,22 @@
 import 'dart:convert';
-import 'dart:developer' as dev;
 import 'package:http/http.dart' as http;
 import 'api_config.dart';
+import 'logger_service.dart';
 
 class AuthService {
   static Future<Map<String, dynamic>> login({
     required String email,
     required String senha,
   }) async {
+    loggerService.d('Iniciando login para email: $email');
+    
     final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/auth/login'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'senha': senha}),
     );
 
-    // dev.log('LOGIN status: ${response.statusCode}');
-    // dev.log('LOGIN body: ${response.body}');
+    loggerService.d('Resposta de login - Status: ${response.statusCode}');
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       dynamic decoded;
@@ -43,6 +44,7 @@ class AuthService {
         userEmail = decoded['email'] ?? email;
       }
 
+      loggerService.i('Login realizado com sucesso para: $userEmail');
       return {
         'success': true,
         'token': token,
@@ -51,6 +53,7 @@ class AuthService {
         'email': userEmail,
       };
     } else {
+      loggerService.w('Falha no login para $email - Status: ${response.statusCode}');
       String message = 'Credenciais inválidas.';
       try {
         final data = jsonDecode(response.body);
@@ -71,6 +74,8 @@ class AuthService {
     required String senha,
     required String confirmarSenha,
   }) async {
+    loggerService.d('Iniciando registro de novo usuário: $email');
+    
     final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/auth/registrar'),
       headers: {'Content-Type': 'application/json'},
@@ -83,8 +88,7 @@ class AuthService {
       }),
     );
 
-    dev.log('REGISTER status: ${response.statusCode}');
-    dev.log('REGISTER body: ${response.body}');
+    loggerService.d('Resposta de registro - Status: ${response.statusCode}');
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       return {'success': true};

@@ -4,6 +4,7 @@ import '../../layouts/desktop_layout.dart';
 import '../../utils/responsive.dart';
 import '../../services/diagnostic_service.dart';
 import '../../services/auth_storage.dart';
+import '../../services/logger_service.dart';
 
 class DiagnosticResultScreen extends StatefulWidget {
   const DiagnosticResultScreen({super.key});
@@ -231,8 +232,8 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
   Widget _buildDiagnosticCard(String diagnostico) {
     final sections = _parseDiagnosticSections(diagnostico);
     // DEBUG temporário — remover depois
-    debugPrint('=== DIAGNÓSTICO RAW (primeiros 200 chars): ${diagnostico.substring(0, diagnostico.length.clamp(0, 200))}');
-    debugPrint('=== SEÇÕES ENCONTRADAS: ${sections.length}');
+    loggerService.d('DIAGNÓSTICO RAW (primeiros 200 chars): ${diagnostico.substring(0, diagnostico.length.clamp(0, 200))}');
+    loggerService.d('SEÇÕES ENCONTRADAS: ${sections.length}');
 
     return Card(
       child: Padding(
@@ -342,7 +343,7 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
     }
     flush();
 
-    debugPrint('=== SEÇÕES: ${sections.map((s) => s["title"]).toList()}');
+    loggerService.d('SEÇÕES: ${sections.map((s) => s["title"]).toList()}');
     return sections;
   }
 

@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:developer' as dev;
 import 'package:http/http.dart' as http;
 import 'api_config.dart';
+import 'logger_service.dart';
 
 class DiagnosticService {
   static Future<Map<String, dynamic>> processarDiagnostico({
@@ -15,6 +15,11 @@ class DiagnosticService {
     required bool urgencia,
     required String usuarioId,
   }) async {
+    loggerService.d(
+      'Iniciando diagnóstico para: $marcaVeiculo $modeloVeiculo ($anoVeiculo) '
+      '- Código ODB2: $codigoODB2'
+    );
+    
     final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/diagnostico-ia/processar'),
       headers: {
@@ -33,13 +38,14 @@ class DiagnosticService {
       }),
     );
 
-    dev.log('DIAGNOSTICO status: ${response.statusCode}');
-    dev.log('DIAGNOSTICO body: ${response.body}');
+    loggerService.d('Resposta de diagnóstico - Status: ${response.statusCode}');
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       final data = jsonDecode(response.body);
+      loggerService.i('Diagnóstico processado com sucesso');
       return {'success': true, 'data': data};
     } else {
+      loggerService.w('Falha ao processar diagnóstico - Status: ${response.statusCode}');
       String message = 'Erro ao processar diagnóstico. (${response.statusCode})';
       try {
         final data = jsonDecode(response.body);
@@ -56,6 +62,8 @@ class DiagnosticService {
   static Future<Map<String, dynamic>> buscarMeuHistorico({
     required String token,
   }) async {
+    loggerService.d('Buscando histórico de diagnósticos');
+    
     final response = await http.get(
       Uri.parse('${ApiConfig.baseUrl}/diagnostico-ia/historico/me'),
       headers: {
@@ -64,16 +72,17 @@ class DiagnosticService {
       },
     );
 
-    dev.log('HISTORICO status: ${response.statusCode}');
-    dev.log('HISTORICO body: ${response.body}');
+    loggerService.d('Resposta de histórico - Status: ${response.statusCode}');
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       final data = jsonDecode(response.body);
+      loggerService.i('Histórico de diagnósticos carregado com sucesso');
       if (data is List) {
         return {'success': true, 'data': data};
       }
       return {'success': true, 'data': [data]};
     } else {
+      loggerService.w('Falha ao buscar histórico - Status: ${response.statusCode}');
       String message = 'Erro ao buscar histórico. (${response.statusCode})';
       try {
         final data = jsonDecode(response.body);
@@ -94,6 +103,8 @@ class DiagnosticService {
     required String status,
     required String dadosParaDiagnosticoId,
   }) async {
+    loggerService.d('Atualizando diagnóstico: $diagnosticoId');
+    
     final response = await http.put(
       Uri.parse('${ApiConfig.baseUrl}/diagnostico-ia/$diagnosticoId'),
       headers: {
@@ -107,8 +118,7 @@ class DiagnosticService {
       }),
     );
 
-    dev.log('ATUALIZAR DIAGNOSTICO status: ${response.statusCode}');
-    dev.log('ATUALIZAR DIAGNOSTICO body: ${response.body}');
+    loggerService.d('Resposta de atualização - Status: ${response.statusCode}');
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       final data = jsonDecode(response.body);
