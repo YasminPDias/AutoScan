@@ -339,12 +339,15 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Código OBD2 *',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
+            Padding(
+              padding: const EdgeInsets.only(left: 5),
+              child: const Text(
+                'Código OBD2 *',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -474,49 +477,60 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                     ],
                   )
                 : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Marca *',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textPrimary,
+                      
+                      Padding(
+                        padding: const EdgeInsets.only(left: 5),
+                        child: const Text(
+                          'Marca *',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 8),
                       CustomTextField(
                         controller: _brandController,
-                        hintText: '',
+                        hintText: 'Ex: Toyota',
                         icon: Icons.directions_car,
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'Modelo *',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textPrimary,
+                      Padding(
+                        padding: const EdgeInsets.only(left: 5),
+                        child: const Text(
+                          'Modelo *',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 8),
                       CustomTextField(
                         controller: _modelController,
-                        hintText: '',
+                        hintText: 'Ex: Corolla',
                         icon: Icons.directions_car,
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'Ano *',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textPrimary,
+                      Padding(
+                        padding: const EdgeInsets.only(left: 5),
+                        child: const Text(
+                          'Ano *',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 8),
                       CustomTextField(
                         controller: _yearController,
-                        hintText: '',
+                        hintText: 'Ex: 2020',
                         icon: Icons.calendar_today,
                         keyboardType: TextInputType.number,
                       ),
@@ -561,12 +575,15 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Sintomas Observados *',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
+            Padding(
+              padding: const EdgeInsets.only(left: 5),
+              child: const Text(
+                'Sintomas Observados *',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -585,12 +602,15 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Tipo de Usuário *',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
+            Padding(
+              padding: const EdgeInsets.only(left: 5),
+              child: const Text(
+                'Tipo de Usuário *',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ),
             const SizedBox(height: 8),

@@ -16,7 +16,7 @@ class HomeScreen extends StatelessWidget {
       child: Container(
         color: AppColors.background,
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(context.isDesktop ? 40 : 20),
+          padding: EdgeInsets.all(context.isDesktop ? 32 : 20),
           child: context.isDesktop
               ? _buildDesktopLayout(context)
               : _buildMobileLayout(context),
@@ -31,13 +31,10 @@ class HomeScreen extends StatelessWidget {
       children: [
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(56),
+          padding: const EdgeInsets.all(48),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [
-                AppColors.primaryRed,
-                Color(0xFFB71C1C),
-              ],
+              colors: [AppColors.primaryRed, Color(0xFFB71C1C)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -115,7 +112,7 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 48),
+        const SizedBox(height: 40),
         Row(
           children: [
             Container(
@@ -137,14 +134,14 @@ class HomeScreen extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 28),
         GridView.count(
           crossAxisCount: 3,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 20,
-          crossAxisSpacing: 20,
-          childAspectRatio: 1.3,
+          mainAxisSpacing: 24,
+          crossAxisSpacing: 24,
+          childAspectRatio: 1.8,
           children: [
             _buildEnhancedFeatureCard(
               icon: Icons.analytics_outlined,
@@ -238,10 +235,7 @@ class HomeScreen extends StatelessWidget {
               const Text(
                 'Sistema Profissional de Diagnóstico Automotivo',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white,
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.white),
               ),
             ],
           ),
@@ -259,21 +253,24 @@ class HomeScreen extends StatelessWidget {
         FeatureCard(
           icon: Icons.analytics_outlined,
           title: 'Diagnósticos Inteligente',
-          description: 'Análise completa e precisa do seu veículo com tecnologia avançada',
+          description:
+              'Análise completa e precisa do seu veículo com tecnologia avançada',
           onTap: () => Navigator.pushNamed(context, '/diagnostic'),
         ),
         const SizedBox(height: 20),
         FeatureCard(
           icon: Icons.chat_bubble_outline,
           title: 'Chat com Especialista',
-          description: 'Tire suas dúvidas com IA ou abra um chamado e aguarde um mecânico especializado',
+          description:
+              'Tire suas dúvidas com IA ou abra um chamado e aguarde um mecânico especializado',
           onTap: () => Navigator.pushNamed(context, '/chat'),
         ),
         const SizedBox(height: 20),
         FeatureCard(
           icon: Icons.description_outlined,
           title: 'Planos e Assinaturas',
-          description: 'Conheça nossos planos e fique por dentro de todas as funcionalidades',
+          description:
+              'Conheça nossos planos e fique por dentro de todas as funcionalidades',
           onTap: () => Navigator.pushNamed(context, '/plans'),
         ),
       ],
@@ -286,9 +283,7 @@ class HomeScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -339,47 +334,41 @@ class HomeScreen extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: 50,
+                  height: 50,
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    icon,
-                    size: 28,
-                    color: color,
-                  ),
+                  child: Icon(icon, size: 28, color: color),
                 ),
                 const Spacer(),
                 Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 2),
                 Text(
                   description,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     color: AppColors.textSecondary,
-                    height: 1.3,
+                    height: 1.2,
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 12),
-                Icon(
-                  Icons.arrow_forward,
-                  size: 18,
-                  color: color,
-                ),
+                const SizedBox(height: 6),
+                Icon(Icons.arrow_forward, size: 18, color: color),
               ],
             ),
           ),

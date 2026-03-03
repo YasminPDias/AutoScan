@@ -1,8 +1,34 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../services/auth_storage.dart';
 
-class AppDrawer extends StatelessWidget {
+class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
+
+  @override
+  State<AppDrawer> createState() => _AppDrawerState();
+}
+
+class _AppDrawerState extends State<AppDrawer> {
+  String _userName = 'Usuário';
+  String _userEmail = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final name = await AuthStorage.getUserName();
+    final email = await AuthStorage.getUserEmail();
+    if (mounted) {
+      setState(() {
+        _userName = name ?? 'Usuário';
+        _userEmail = email ?? '';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,9 +38,7 @@ class AppDrawer extends StatelessWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
-            decoration: const BoxDecoration(
-              color: AppColors.primaryRed,
-            ),
+            decoration: const BoxDecoration(color: AppColors.primaryRed),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -44,24 +68,25 @@ class AppDrawer extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Center(
+                Center(
                   child: Text(
-                    'Yasmin Dias',
-                    style: TextStyle(
+                    _userName,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
-                const SizedBox(height: 4),
-                const Center(
+                const SizedBox(height: 8),
+                Center(
                   child: Text(
-                    'yasmindias001@gmail.com',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                    ),
+                    _userEmail,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],

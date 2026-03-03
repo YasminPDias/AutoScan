@@ -302,8 +302,9 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
         return {'icon': Icons.search, 'color': const Color(0xFFE64A19)};
       } else if (t.contains('recomend')) {
         return {'icon': Icons.build, 'color': const Color(0xFF1976D2)};
-      } else if (t.contains('risco')) {
-        return {'icon': Icons.warning_amber, 'color': const Color(0xFFFFA000)};
+      // } 
+      // else if (t.contains('risco')) {
+      //   return {'icon': Icons.warning_amber, 'color': const Color(0xFFFFA000)};
       } else {
         return {'icon': Icons.info_outline, 'color': const Color(0xFF7B1FA2)};
       }
@@ -377,7 +378,7 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
                   ),
                 ),
               ),
-              if (title == 'Nível de Risco') _buildRiskBadge(content),
+            //  if (title == 'Nível de Risco') _buildRiskBadge(content),
             ],
           ),
           const SizedBox(height: 12),

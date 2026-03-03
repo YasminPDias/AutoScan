@@ -80,16 +80,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             fontWeight: FontWeight.bold,
                             color: AppColors.textPrimary,
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _userEmail,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
-                          ),
                           textAlign: TextAlign.center,
                         ),
+                        const SizedBox(height: 12),
+                        if (_userEmail.isNotEmpty)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      _userEmail,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.content_copy_outlined,
+                                  size: 18,
+                                ),
+                                onPressed: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Email copiado: $_userEmail',
+                                      ),
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                            ],
+                          ),
                         const SizedBox(height: 24),
                         SizedBox(
                           width: double.infinity,
@@ -310,14 +345,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
+                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  _userEmail,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                  ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _userEmail,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Email copiado: $_userEmail'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      child: const Icon(
+                        Icons.content_copy_outlined,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -454,7 +516,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primaryRed,
-                      side: const BorderSide(color: AppColors.primaryRed, width: 2),
+                      side: const BorderSide(
+                        color: AppColors.primaryRed,
+                        width: 2,
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -525,10 +590,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         leading: Icon(icon, color: AppColors.textPrimary),
         title: Text(
           title,
-          style: const TextStyle(
-            fontSize: 15,
-            color: AppColors.textPrimary,
-          ),
+          style: const TextStyle(fontSize: 15, color: AppColors.textPrimary),
         ),
         trailing: trailing,
         onTap: onTap,
