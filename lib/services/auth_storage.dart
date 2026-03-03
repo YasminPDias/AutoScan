@@ -91,6 +91,10 @@ class AuthStorage {
     return _get('user_email');
   }
 
+  static Future<String?> getUserId() async {
+    return _get('user_id');
+  }
+
   static Future<void> clear() async {
     _remove('auth_token');
     _remove('user_id');

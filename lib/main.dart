@@ -7,6 +7,7 @@ import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/history/history_screen.dart';
 import 'screens/diagnostic/diagnostic_screen.dart';
+import 'screens/diagnostic/diagnostic_result_screen.dart';
 import 'screens/plans/plans_screen.dart';
 import 'screens/chat/chat_screen.dart';
 
@@ -33,6 +34,7 @@ class AutoScanApp extends StatelessWidget {
         '/profile': (context) => const ProfileScreen(),
         '/history': (context) => const HistoryScreen(),
         '/diagnostic': (context) => const DiagnosticScreen(),
+        '/diagnostic-result': (context) => const DiagnosticResultScreen(),
         '/plans': (context) => const PlansScreen(),
         '/chat': (context) => const ChatScreen(),
       },

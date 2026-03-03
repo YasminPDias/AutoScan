@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import '../../theme/app_colors.dart';
 import '../../utils/responsive.dart';
-import '../../services/api_service.dart';
+import '../../services/auth_service.dart';
 import '../../services/auth_storage.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -25,6 +26,28 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  String? _extractUserIdFromJwt(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+      String payload = parts[1];
+      // Add padding if needed
+      switch (payload.length % 4) {
+        case 2:
+          payload += '==';
+          break;
+        case 3:
+          payload += '=';
+          break;
+      }
+      final decoded = utf8.decode(base64Url.decode(payload));
+      final Map<String, dynamic> data = jsonDecode(decoded);
+      return data['sub']?.toString() ?? data['id']?.toString() ?? data['userId']?.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _login() async {
     final email = _emailController.text.trim();
     final senha = _senhaController.text;
@@ -40,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final result = await ApiService.login(email: email, senha: senha);
+      final result = await AuthService.login(email: email, senha: senha);
 
       if (!mounted) return;
 
@@ -53,7 +76,15 @@ class _LoginScreenState extends State<LoginScreen> {
         final sobrenome = result['sobrenome'] ?? '';
         final fullName = [nome, sobrenome].where((s) => s.toString().isNotEmpty).join(' ');
         final userEmail = result['email'] ?? email;
+
+        // Extract user ID from JWT token
+        String? userId = result['id']?.toString() ?? result['userId']?.toString();
+        if (userId == null && token.isNotEmpty) {
+          userId = _extractUserIdFromJwt(token);
+        }
+
         await AuthStorage.saveUser(
+          id: userId,
           name: fullName.isNotEmpty ? fullName : email,
           email: userEmail,
         );

@@ -4,6 +4,8 @@ import '../../layouts/desktop_layout.dart';
 import '../../utils/responsive.dart';
 import '../../widgets_defaults/custom_button.dart';
 import '../../widgets_defaults/custom_text_field.dart';
+import '../../services/diagnostic_service.dart';
+import '../../services/auth_storage.dart';
 
 class DiagnosticScreen extends StatefulWidget {
   const DiagnosticScreen({super.key});
@@ -13,13 +15,93 @@ class DiagnosticScreen extends StatefulWidget {
 }
 
 class _DiagnosticScreenState extends State<DiagnosticScreen> {
-  String userType = 'mecanico';
+  String userType = 'MECANICO';
   bool roadAssistance = false;
+  bool _isLoading = false;
+  String? _errorMessage;
   final TextEditingController _codeController = TextEditingController();
   final TextEditingController _brandController = TextEditingController();
   final TextEditingController _modelController = TextEditingController();
   final TextEditingController _yearController = TextEditingController();
   final TextEditingController _symptomsController = TextEditingController();
+
+  Future<void> _submitDiagnostic() async {
+    // Validate fields
+    if (_codeController.text.trim().isEmpty) {
+      setState(() => _errorMessage = 'Informe o código OBD2.');
+      return;
+    }
+    if (_brandController.text.trim().isEmpty) {
+      setState(() => _errorMessage = 'Informe a marca do veículo.');
+      return;
+    }
+    if (_modelController.text.trim().isEmpty) {
+      setState(() => _errorMessage = 'Informe o modelo do veículo.');
+      return;
+    }
+    if (_yearController.text.trim().isEmpty) {
+      setState(() => _errorMessage = 'Informe o ano do veículo.');
+      return;
+    }
+    final ano = int.tryParse(_yearController.text.trim());
+    if (ano == null) {
+      setState(() => _errorMessage = 'Ano inválido. Informe um número.');
+      return;
+    }
+    if (_symptomsController.text.trim().isEmpty) {
+      setState(() => _errorMessage = 'Descreva os sintomas observados.');
+      return;
+    }
+
+    final token = await AuthStorage.getToken();
+    if (token == null || token.isEmpty) {
+      setState(() => _errorMessage = 'Sessão expirada. Faça login novamente.');
+      return;
+    }
+
+    final userId = await AuthStorage.getUserId();
+    if (userId == null || userId.isEmpty) {
+      setState(() => _errorMessage = 'ID do usuário não encontrado. Faça login novamente.');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final result = await DiagnosticService.processarDiagnostico(
+        token: token,
+        codigoODB2: _codeController.text.trim(),
+        marcaVeiculo: _brandController.text.trim(),
+        modeloVeiculo: _modelController.text.trim(),
+        anoVeiculo: ano,
+        sintomas: _symptomsController.text.trim(),
+        tipoSolicitante: userType,
+        urgencia: roadAssistance,
+        usuarioId: userId,
+      );
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        final data = result['data'] as Map<String, dynamic>;
+        Navigator.pushReplacementNamed(
+          context,
+          '/diagnostic-result',
+          arguments: data,
+        );
+      } else {
+        setState(() => _errorMessage = result['message'] ?? 'Erro ao processar diagnóstico.');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = 'Erro de conexão: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +145,10 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
           ),
         ),
         const SizedBox(height: 32),
+        if (_errorMessage != null) ...[
+          _buildErrorBanner(),
+          const SizedBox(height: 16),
+        ],
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -76,10 +162,31 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                   const SizedBox(height: 20),
                   _buildInfoCard(),
                   const SizedBox(height: 24),
-                  CustomButton(
-                    text: 'Gerar Diagnóstico',
-                    onPressed: () {},
-                  ),
+                  _isLoading
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                CircularProgressIndicator(
+                                  color: AppColors.primaryRed,
+                                ),
+                                SizedBox(height: 12),
+                                Text(
+                                  'Processando diagnóstico com IA...',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : CustomButton(
+                          text: 'Gerar Diagnóstico',
+                          onPressed: _submitDiagnostic,
+                        ),
                 ],
               ),
             ),
@@ -123,6 +230,10 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
             ],
           ),
         ),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 16),
+          _buildErrorBanner(),
+        ],
         const SizedBox(height: 24),
         _buildCodeCard(),
         const SizedBox(height: 16),
@@ -130,11 +241,68 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
         const SizedBox(height: 16),
         _buildInfoCard(),
         const SizedBox(height: 24),
-        CustomButton(
-          text: 'Gerar diagnóstico',
-          onPressed: () {},
-        ),
+        _isLoading
+            ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      CircularProgressIndicator(
+                        color: AppColors.primaryRed,
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        'Processando diagnóstico com IA...',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : CustomButton(
+                text: 'Gerar diagnóstico',
+                onPressed: _submitDiagnostic,
+              ),
       ],
+    );
+  }
+
+  Widget _buildErrorBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.primaryRed.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: AppColors.primaryRed.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline,
+              color: AppColors.primaryRed, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              _errorMessage!,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.primaryRed,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 18, color: AppColors.primaryRed),
+            onPressed: () => setState(() => _errorMessage = null),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -431,7 +599,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                 Expanded(
                   child: RadioListTile<String>(
                     title: const Text('Mecânico'),
-                    value: 'mecanico',
+                    value: 'MECANICO',
                     groupValue: userType,
                     activeColor: AppColors.primaryRed,
                     onChanged: (value) {
@@ -444,7 +612,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                 Expanded(
                   child: RadioListTile<String>(
                     title: const Text('Proprietário'),
-                    value: 'proprietario',
+                    value: 'PROPRIETARIO',
                     groupValue: userType,
                     activeColor: AppColors.primaryRed,
                     onChanged: (value) {
@@ -517,7 +685,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                 ),
               _buildPreviewItem(
                 'Usuário',
-                userType == 'mecanico' ? 'Mecânico' : 'Proprietário',
+                userType == 'MECANICO' ? 'Mecânico' : 'Proprietário',
               ),
               _buildPreviewItem(
                 'Urgência',

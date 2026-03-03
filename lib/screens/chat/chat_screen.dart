@@ -12,34 +12,42 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
-  final List<ChatMessage> _messages = [
-    ChatMessage(
-      text: 'Lorem ipsum is simply dummy text of the printing and typesetting industry. Lorem ipsum has been the industry\'s standard dummy text ever since the 1E',
-      isUser: false,
-      timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-    ),
-    ChatMessage(
-      text: '''• Lorem ipsum is simply
-• dummy text of the printing
-• and typesetting industry.
-• Lorem ipsum has been the
-• industry's standard dummy
-• text ever since the 1900s
-• when an unknown printer
-• took a galley of type and
-• scrambled it to make a
-• type specimen book. It has
-• survived not''',
-      isUser: false,
-      timestamp: DateTime.now().subtract(const Duration(minutes: 3)),
-      isHighlighted: true,
-    ),
-    ChatMessage(
-      text: 'Lorem ipsum is simply dummy text of the printing and typesetting industry. Lorem ipsum has been the industry\'s standard dummy text ever since the 1E',
-      isUser: true,
-      timestamp: DateTime.now().subtract(const Duration(minutes: 1)),
-    ),
-  ];
+  late List<ChatMessage> _messages;
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      final diagnosticoText = args?['diagnostico'] as String?;
+
+      if (diagnosticoText != null && diagnosticoText.isNotEmpty) {
+        _messages = [
+          ChatMessage(
+            text: '🔧 Diagnóstico Gerado:\n\n$diagnosticoText',
+            isUser: false,
+            timestamp: DateTime.now(),
+            isHighlighted: true,
+          ),
+          ChatMessage(
+            text: 'Com base no diagnóstico acima, como posso te ajudar? Você pode me fazer perguntas sobre as causas, recomendações ou pedir mais detalhes.',
+            isUser: false,
+            timestamp: DateTime.now(),
+          ),
+        ];
+      } else {
+        _messages = [
+          ChatMessage(
+            text: 'Olá! Sou o assistente AutoScan. Como posso te ajudar com o diagnóstico do seu veículo?',
+            isUser: false,
+            timestamp: DateTime.now(),
+          ),
+        ];
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

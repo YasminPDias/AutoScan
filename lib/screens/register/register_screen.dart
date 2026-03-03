@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
-import '../../services/api_service.dart';
+import '../../services/auth_service.dart';
 import '../../services/auth_storage.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -60,7 +60,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      final result = await ApiService.registrar(
+      final result = await AuthService.registrar(
         nome: nome,
         sobrenome: sobrenome,
         email: email,
