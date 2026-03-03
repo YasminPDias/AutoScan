@@ -14,10 +14,10 @@ import 'services/logger_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Inicializza o serviço de logging
   logN.i('App iniciado');
-  
+
   runApp(const AutoScanApp());
 }
 

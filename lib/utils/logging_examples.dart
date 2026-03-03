@@ -1,5 +1,5 @@
 /// Template para integração do LoggerService em novos widgets/serviços
-/// 
+///
 /// IMPORTANTE: Este arquivo contém exemplos de código comentados
 /// e não é executável diretamente. Use-o como referência para integrar
 /// o LoggerService em seus próprios arquivos.

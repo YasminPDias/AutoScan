@@ -17,9 +17,9 @@ class DiagnosticService {
   }) async {
     loggerService.d(
       'Iniciando diagnóstico para: $marcaVeiculo $modeloVeiculo ($anoVeiculo) '
-      '- Código ODB2: $codigoODB2'
+      '- Código ODB2: $codigoODB2',
     );
-    
+
     final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/diagnostico-ia/processar'),
       headers: {
@@ -45,15 +45,19 @@ class DiagnosticService {
       loggerService.i('Diagnóstico processado com sucesso');
       return {'success': true, 'data': data};
     } else {
-      loggerService.w('Falha ao processar diagnóstico - Status: ${response.statusCode}');
-      String message = 'Erro ao processar diagnóstico. (${response.statusCode})';
+      loggerService.w(
+        'Falha ao processar diagnóstico - Status: ${response.statusCode}',
+      );
+      String message =
+          'Erro ao processar diagnóstico. (${response.statusCode})';
       try {
         final data = jsonDecode(response.body);
         if (data is Map) {
           message = data['message'] ?? data['error'] ?? message;
         }
       } catch (_) {
-        if (response.body.isNotEmpty) message = '${response.statusCode}: ${response.body}';
+        if (response.body.isNotEmpty)
+          message = '${response.statusCode}: ${response.body}';
       }
       return {'success': false, 'message': message};
     }
@@ -63,7 +67,7 @@ class DiagnosticService {
     required String token,
   }) async {
     loggerService.d('Buscando histórico de diagnósticos');
-    
+
     final response = await http.get(
       Uri.parse('${ApiConfig.baseUrl}/diagnostico-ia/historico/me'),
       headers: {
@@ -80,9 +84,14 @@ class DiagnosticService {
       if (data is List) {
         return {'success': true, 'data': data};
       }
-      return {'success': true, 'data': [data]};
+      return {
+        'success': true,
+        'data': [data],
+      };
     } else {
-      loggerService.w('Falha ao buscar histórico - Status: ${response.statusCode}');
+      loggerService.w(
+        'Falha ao buscar histórico - Status: ${response.statusCode}',
+      );
       String message = 'Erro ao buscar histórico. (${response.statusCode})';
       try {
         final data = jsonDecode(response.body);
@@ -90,7 +99,8 @@ class DiagnosticService {
           message = data['message'] ?? data['error'] ?? message;
         }
       } catch (_) {
-        if (response.body.isNotEmpty) message = '${response.statusCode}: ${response.body}';
+        if (response.body.isNotEmpty)
+          message = '${response.statusCode}: ${response.body}';
       }
       return {'success': false, 'message': message};
     }
@@ -104,7 +114,7 @@ class DiagnosticService {
     required String dadosParaDiagnosticoId,
   }) async {
     loggerService.d('Atualizando diagnóstico: $diagnosticoId');
-    
+
     final response = await http.put(
       Uri.parse('${ApiConfig.baseUrl}/diagnostico-ia/$diagnosticoId'),
       headers: {
@@ -124,14 +134,16 @@ class DiagnosticService {
       final data = jsonDecode(response.body);
       return {'success': true, 'data': data};
     } else {
-      String message = 'Erro ao atualizar diagnóstico. (${response.statusCode})';
+      String message =
+          'Erro ao atualizar diagnóstico. (${response.statusCode})';
       try {
         final data = jsonDecode(response.body);
         if (data is Map) {
           message = data['message'] ?? data['error'] ?? message;
         }
       } catch (_) {
-        if (response.body.isNotEmpty) message = '${response.statusCode}: ${response.body}';
+        if (response.body.isNotEmpty)
+          message = '${response.statusCode}: ${response.body}';
       }
       return {'success': false, 'message': message};
     }

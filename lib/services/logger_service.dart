@@ -1,11 +1,11 @@
 import 'package:logger/logger.dart';
 
 /// Serviço centralizado de logging para a aplicação AutoScan
-/// 
+///
 /// Exemplo de uso:
 /// ```dart
 /// import 'package:autoscan/services/logger_service.dart';
-/// 
+///
 /// loggerService.d('Mensagem de debug');
 /// loggerService.i('Informação');
 /// loggerService.w('Aviso');
@@ -94,5 +94,5 @@ class LoggerService {
 final loggerService = LoggerService();
 
 /// Aliases curtos para uso rápido
-final logN = loggerService;  // Usar: logN.d(), logN.w(), logN.e(), etc
-final log = loggerService;   // Alternativa: log.d(), log.w(), log.e(), etc
+final logN = loggerService; // Usar: logN.d(), logN.w(), logN.e(), etc
+final log = loggerService; // Alternativa: log.d(), log.w(), log.e(), etc

@@ -20,7 +20,8 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _data ??= ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    _data ??=
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
   }
 
   @override
@@ -66,10 +67,28 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
         body: SingleChildScrollView(
           padding: EdgeInsets.all(context.isDesktop ? 40 : 20),
           child: context.isDesktop
-              ? _buildDesktopLayout(context, diagnostico, status, codigo,
-                  marca, modelo, ano, sintomas, createdAt)
-              : _buildMobileLayout(context, diagnostico, status, codigo, marca,
-                  modelo, ano, sintomas, createdAt),
+              ? _buildDesktopLayout(
+                  context,
+                  diagnostico,
+                  status,
+                  codigo,
+                  marca,
+                  modelo,
+                  ano,
+                  sintomas,
+                  createdAt,
+                )
+              : _buildMobileLayout(
+                  context,
+                  diagnostico,
+                  status,
+                  codigo,
+                  marca,
+                  modelo,
+                  ano,
+                  sintomas,
+                  createdAt,
+                ),
         ),
       ),
     );
@@ -127,7 +146,13 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
             Expanded(
               flex: 4,
               child: _buildVehicleInfoCard(
-                  codigo, marca, modelo, ano, sintomas, createdAt),
+                codigo,
+                marca,
+                modelo,
+                ano,
+                sintomas,
+                createdAt,
+              ),
             ),
           ],
         ),
@@ -232,7 +257,9 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
   Widget _buildDiagnosticCard(String diagnostico) {
     final sections = _parseDiagnosticSections(diagnostico);
     // DEBUG temporário — remover depois
-    loggerService.d('DIAGNÓSTICO RAW (primeiros 200 chars): ${diagnostico.substring(0, diagnostico.length.clamp(0, 200))}');
+    loggerService.d(
+      'DIAGNÓSTICO RAW (primeiros 200 chars): ${diagnostico.substring(0, diagnostico.length.clamp(0, 200))}',
+    );
     loggerService.d('SEÇÕES ENCONTRADAS: ${sections.length}');
 
     return Card(
@@ -298,14 +325,17 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
     Map<String, dynamic> _sectionStyle(String title) {
       final t = title.toLowerCase();
       if (t.contains('diagn')) {
-        return {'icon': Icons.medical_information, 'color': AppColors.primaryRed};
+        return {
+          'icon': Icons.medical_information,
+          'color': AppColors.primaryRed,
+        };
       } else if (t.contains('causa') || t.contains('poss')) {
         return {'icon': Icons.search, 'color': const Color(0xFFE64A19)};
       } else if (t.contains('recomend')) {
         return {'icon': Icons.build, 'color': const Color(0xFF1976D2)};
-      // } 
-      // else if (t.contains('risco')) {
-      //   return {'icon': Icons.warning_amber, 'color': const Color(0xFFFFA000)};
+        // }
+        // else if (t.contains('risco')) {
+        //   return {'icon': Icons.warning_amber, 'color': const Color(0xFFFFA000)};
       } else {
         return {'icon': Icons.info_outline, 'color': const Color(0xFF7B1FA2)};
       }
@@ -379,7 +409,7 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
                   ),
                 ),
               ),
-            //  if (title == 'Nível de Risco') _buildRiskBadge(content),
+              //  if (title == 'Nível de Risco') _buildRiskBadge(content),
             ],
           ),
           const SizedBox(height: 12),
@@ -399,28 +429,29 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
       if (line.trim().isEmpty) continue;
 
       // 1. Lista numerada: "1.  texto"
-      final numberedMatch =
-          RegExp(r'^(\d+)\.\s+(.+)$').firstMatch(line.trim());
+      final numberedMatch = RegExp(r'^(\d+)\.\s+(.+)$').firstMatch(line.trim());
       if (numberedMatch != null) {
         final number = numberedMatch.group(1)!;
         final itemText = numberedMatch.group(2)!;
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(bottom: 8, top: 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '$number.  ',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: accentColor,
-                  fontSize: 14,
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8, top: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$number.  ',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: accentColor,
+                    fontSize: 14,
+                  ),
                 ),
-              ),
-              Expanded(child: _buildRichText(itemText, 14)),
-            ],
+                Expanded(child: _buildRichText(itemText, 14)),
+              ],
+            ),
           ),
-        ));
+        );
         continue;
       }
 
@@ -430,35 +461,39 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
         final indentLen = bulletMatch.group(1)!.length;
         final bulletText = bulletMatch.group(2)!;
         final leftPad = indentLen <= 4 ? 16.0 : 32.0;
-        widgets.add(Padding(
-          padding: EdgeInsets.only(left: leftPad, bottom: 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 7),
-                child: Container(
-                  width: 4,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: accentColor,
-                    shape: BoxShape.circle,
+        widgets.add(
+          Padding(
+            padding: EdgeInsets.only(left: leftPad, bottom: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 7),
+                  child: Container(
+                    width: 4,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: accentColor,
+                      shape: BoxShape.circle,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(child: _buildRichText(bulletText, 13)),
-            ],
+                const SizedBox(width: 8),
+                Expanded(child: _buildRichText(bulletText, 13)),
+              ],
+            ),
           ),
-        ));
+        );
         continue;
       }
 
       // 3. Parágrafo normal
-      widgets.add(Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: _buildRichText(line.trim(), 14),
-      ));
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: _buildRichText(line.trim(), 14),
+        ),
+      );
     }
 
     return Column(
@@ -477,10 +512,12 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
       if (match.start > lastEnd) {
         spans.add(TextSpan(text: text.substring(lastEnd, match.start)));
       }
-      spans.add(TextSpan(
-        text: match.group(1),
-        style: const TextStyle(fontWeight: FontWeight.w700),
-      ));
+      spans.add(
+        TextSpan(
+          text: match.group(1),
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      );
       lastEnd = match.end;
     }
     if (lastEnd < text.length) {
@@ -554,7 +591,11 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
           children: [
             const Row(
               children: [
-                Icon(Icons.directions_car, color: AppColors.primaryRed, size: 20),
+                Icon(
+                  Icons.directions_car,
+                  color: AppColors.primaryRed,
+                  size: 20,
+                ),
                 SizedBox(width: 8),
                 Text(
                   'Dados do Veículo',
@@ -572,7 +613,8 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
               _buildInfoRow('Veículo', '$marca $modelo'.trim()),
             if (ano.isNotEmpty) _buildInfoRow('Ano', ano),
             if (sintomas.isNotEmpty) _buildInfoRow('Sintomas', sintomas),
-            if (createdAt.isNotEmpty) _buildInfoRow('Data', _formatDate(createdAt)),
+            if (createdAt.isNotEmpty)
+              _buildInfoRow('Data', _formatDate(createdAt)),
           ],
         ),
       ),
@@ -627,7 +669,9 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
       if (token == null || token.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sessão expirada. Faça login novamente.')),
+          const SnackBar(
+            content: Text('Sessão expirada. Faça login novamente.'),
+          ),
         );
         setState(() => _isUpdating = false);
         return;
@@ -635,7 +679,8 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
 
       final diagnosticoId = data['id']?.toString() ?? '';
       final diagnosticoTexto = data['diagnostico'] ?? '';
-      final dadosVeiculo = data['dadosParaDiagnostico'] as Map<String, dynamic>? ?? {};
+      final dadosVeiculo =
+          data['dadosParaDiagnostico'] as Map<String, dynamic>? ?? {};
       final dadosId = dadosVeiculo['id']?.toString() ?? '';
 
       if (diagnosticoId.isEmpty) {
@@ -726,7 +771,9 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
                   )
                 : const Icon(Icons.check_circle_outline, color: Colors.white),
             label: Text(
-              _isUpdating ? 'Atualizando...' : 'Funcionou! Resolveu meu problema',
+              _isUpdating
+                  ? 'Atualizando...'
+                  : 'Funcionou! Resolveu meu problema',
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -747,14 +794,19 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            onPressed: _isUpdating ? null : () {
-              Navigator.pushNamed(
-                context,
-                '/chat',
-                arguments: {'diagnostico': diagnostico},
-              );
-            },
-            icon: const Icon(Icons.chat_bubble_outline, color: AppColors.primaryRed),
+            onPressed: _isUpdating
+                ? null
+                : () {
+                    Navigator.pushNamed(
+                      context,
+                      '/chat',
+                      arguments: {'diagnostico': diagnostico},
+                    );
+                  },
+            icon: const Icon(
+              Icons.chat_bubble_outline,
+              color: AppColors.primaryRed,
+            ),
             label: const Text(
               'Continuar no Chat',
               style: TextStyle(

@@ -9,7 +9,7 @@ class AuthService {
     required String senha,
   }) async {
     loggerService.d('Iniciando login para email: $email');
-    
+
     final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/auth/login'),
       headers: {'Content-Type': 'application/json'},
@@ -34,13 +34,18 @@ class AuthService {
       if (decoded is String) {
         token = decoded;
       } else if (decoded is Map<String, dynamic>) {
-        token = decoded['token'] ??
+        token =
+            decoded['token'] ??
             decoded['access_token'] ??
             decoded['accessToken'] ??
             decoded['jwt'] ??
             '';
         nome = decoded['nome'] ?? decoded['name'] ?? '';
-        sobrenome = decoded['sobrenome'] ?? decoded['lastName'] ?? decoded['surname'] ?? '';
+        sobrenome =
+            decoded['sobrenome'] ??
+            decoded['lastName'] ??
+            decoded['surname'] ??
+            '';
         userEmail = decoded['email'] ?? email;
       }
 
@@ -53,7 +58,9 @@ class AuthService {
         'email': userEmail,
       };
     } else {
-      loggerService.w('Falha no login para $email - Status: ${response.statusCode}');
+      loggerService.w(
+        'Falha no login para $email - Status: ${response.statusCode}',
+      );
       String message = 'Credenciais inválidas.';
       try {
         final data = jsonDecode(response.body);
@@ -75,7 +82,7 @@ class AuthService {
     required String confirmarSenha,
   }) async {
     loggerService.d('Iniciando registro de novo usuário: $email');
-    
+
     final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/auth/registrar'),
       headers: {'Content-Type': 'application/json'},
@@ -102,7 +109,8 @@ class AuthService {
           message = data;
         }
       } catch (_) {
-        if (response.body.isNotEmpty) message = '${response.statusCode}: ${response.body}';
+        if (response.body.isNotEmpty)
+          message = '${response.statusCode}: ${response.body}';
       }
       return {'success': false, 'message': message};
     }
