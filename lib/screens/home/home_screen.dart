@@ -3,9 +3,39 @@ import '../../theme/app_colors.dart';
 import '../../layouts/desktop_layout.dart';
 import '../../utils/responsive.dart';
 import '../../widgets_defaults/feature_card.dart';
+import '../../services/auth_storage.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  String _userName = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final name = await AuthStorage.getUserName();
+    if (!mounted) return;
+    setState(() {
+      _userName = name?.trim() ?? '';
+    });
+  }
+
+  String get _welcomeTitle {
+    if (_userName.isEmpty) return 'Bem-vindo ao AutoScan';
+    final firstName = _userName.split(' ').first.trim();
+    return firstName.isEmpty
+        ? 'Bem-vindo ao AutoScan'
+        : 'Bem-vindo, $firstName';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,8 +108,8 @@ class HomeScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Bem-vindo ao AutoScan',
+                    Text(
+                      _welcomeTitle,
                       style: TextStyle(
                         fontSize: 36,
                         fontWeight: FontWeight.bold,
@@ -141,7 +171,7 @@ class HomeScreen extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           mainAxisSpacing: 24,
           crossAxisSpacing: 24,
-          childAspectRatio: 1.8,
+          childAspectRatio: 1.35,
           children: [
             _buildEnhancedFeatureCard(
               icon: Icons.analytics_outlined,
@@ -222,8 +252,8 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
-                'Bem-vindo ao AutoScan',
+              Text(
+                _welcomeTitle,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 20,
@@ -336,39 +366,48 @@ class HomeScreen extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 50,
-                  height: 50,
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, size: 28, color: color),
+                  child: Icon(icon, size: 24, color: color),
                 ),
-                const Spacer(),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        description,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          height: 1.15,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    height: 1.2,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 6),
-                Icon(Icons.arrow_forward, size: 18, color: color),
+                Icon(Icons.arrow_forward, size: 16, color: color),
               ],
             ),
           ),

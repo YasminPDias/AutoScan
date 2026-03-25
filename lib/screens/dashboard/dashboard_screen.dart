@@ -4,9 +4,33 @@ import '../../layouts/desktop_layout.dart';
 import '../../utils/responsive.dart';
 import '../../widgets_defaults/stat_card.dart';
 import '../../widgets_defaults/diagnostic_item.dart';
+import '../../services/auth_storage.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  String _userName = 'Usuário';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final name = await AuthStorage.getUserName();
+    if (!mounted) return;
+    setState(() {
+      _userName = (name != null && name.trim().isNotEmpty)
+          ? name.trim()
+          : 'Usuário';
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,21 +96,21 @@ class DashboardScreen extends StatelessWidget {
               const SizedBox(height: 16),
               DiagnosticItem(
                 code: 'Código: P0301',
-                vehicle: 'Toyota Corolla 2020\nUsuário: Alisson Henrique',
+                vehicle: 'Toyota Corolla 2020\nUsuário: $_userName',
                 date: 'Há 18 min',
                 status: DiagnosticStatus.urgent,
                 onTap: () {},
               ),
               DiagnosticItem(
                 code: 'Código: P0420',
-                vehicle: 'Ford Fiesta 2018\nUsuário: Alisson Henrique',
+                vehicle: 'Ford Fiesta 2018\nUsuário: $_userName',
                 date: 'Há 1 hora',
                 status: DiagnosticStatus.pending,
                 onTap: () {},
               ),
               DiagnosticItem(
                 code: 'Código: P0301',
-                vehicle: 'Toyota Corolla 2020\nUsuário: Alisson Henrique',
+                vehicle: 'Toyota Corolla 2020\nUsuário: $_userName',
                 date: 'Há 18 min',
                 status: DiagnosticStatus.resolved,
                 onTap: () {},

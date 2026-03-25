@@ -25,6 +25,22 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
   final TextEditingController _yearController = TextEditingController();
   final TextEditingController _symptomsController = TextEditingController();
 
+  @override
+  void initState() {
+    super.initState();
+    _loadUserType();
+  }
+
+  Future<void> _loadUserType() async {
+    final role = await AuthStorage.getUserRole();
+    if (!mounted || role == null) return;
+
+    final normalized = role.trim().toUpperCase();
+    setState(() {
+      userType = normalized == 'MECANICO' ? 'MECANICO' : 'PROPRIETARIO';
+    });
+  }
+
   Future<void> _submitDiagnostic() async {
     // Validate fields
     if (_codeController.text.trim().isEmpty) {
@@ -61,7 +77,10 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
 
     final userId = await AuthStorage.getUserId();
     if (userId == null || userId.isEmpty) {
-      setState(() => _errorMessage = 'ID do usuário não encontrado. Faça login novamente.');
+      setState(
+        () => _errorMessage =
+            'ID do usuário não encontrado. Faça login novamente.',
+      );
       return;
     }
 
@@ -93,7 +112,10 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
           arguments: data,
         );
       } else {
-        setState(() => _errorMessage = result['message'] ?? 'Erro ao processar diagnóstico.');
+        setState(
+          () => _errorMessage =
+              result['message'] ?? 'Erro ao processar diagnóstico.',
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -116,10 +138,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
             : AppBar(
                 title: const Text('Diagnóstico'),
                 actions: [
-                  IconButton(
-                    icon: const Icon(Icons.person),
-                    onPressed: () {},
-                  ),
+                  IconButton(icon: const Icon(Icons.person), onPressed: () {}),
                 ],
               ),
         body: SingleChildScrollView(
@@ -247,9 +266,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                   padding: EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      CircularProgressIndicator(
-                        color: AppColors.primaryRed,
-                      ),
+                      CircularProgressIndicator(color: AppColors.primaryRed),
                       SizedBox(height: 12),
                       Text(
                         'Processando diagnóstico com IA...',
@@ -276,14 +293,15 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
       decoration: BoxDecoration(
         color: AppColors.primaryRed.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: AppColors.primaryRed.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: AppColors.primaryRed.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline,
-              color: AppColors.primaryRed, size: 20),
+          const Icon(
+            Icons.error_outline,
+            color: AppColors.primaryRed,
+            size: 20,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -296,7 +314,11 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.close, size: 18, color: AppColors.primaryRed),
+            icon: const Icon(
+              Icons.close,
+              size: 18,
+              color: AppColors.primaryRed,
+            ),
             onPressed: () => setState(() => _errorMessage = null),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
@@ -477,9 +499,8 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                     ],
                   )
                 : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      
                       Padding(
                         padding: const EdgeInsets.only(left: 5),
                         child: const Text(
@@ -669,7 +690,8 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
   }
 
   Widget _buildPreviewCard() {
-    final hasData = _codeController.text.isNotEmpty ||
+    final hasData =
+        _codeController.text.isNotEmpty ||
         _brandController.text.isNotEmpty ||
         _modelController.text.isNotEmpty;
 
@@ -698,7 +720,8 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
             if (hasData) ...[
               if (_codeController.text.isNotEmpty)
                 _buildPreviewItem('Código', _codeController.text),
-              if (_brandController.text.isNotEmpty && _modelController.text.isNotEmpty)
+              if (_brandController.text.isNotEmpty &&
+                  _modelController.text.isNotEmpty)
                 _buildPreviewItem(
                   'Veículo',
                   '${_brandController.text} ${_modelController.text}${_yearController.text.isNotEmpty ? ' ${_yearController.text}' : ''}',
@@ -727,7 +750,11 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
     );
   }
 
-  Widget _buildPreviewItem(String label, String value, {bool isUrgent = false}) {
+  Widget _buildPreviewItem(
+    String label,
+    String value, {
+    bool isUrgent = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -746,7 +773,9 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
               value,
               style: TextStyle(
                 fontSize: 13,
-                color: isUrgent ? AppColors.statusUrgent : AppColors.textSecondary,
+                color: isUrgent
+                    ? AppColors.statusUrgent
+                    : AppColors.textSecondary,
                 fontWeight: isUrgent ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
@@ -765,7 +794,11 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
           children: [
             const Row(
               children: [
-                Icon(Icons.lightbulb_outline, color: AppColors.primaryRed, size: 20),
+                Icon(
+                  Icons.lightbulb_outline,
+                  color: AppColors.primaryRed,
+                  size: 20,
+                ),
                 SizedBox(width: 8),
                 Text(
                   'Dicas',

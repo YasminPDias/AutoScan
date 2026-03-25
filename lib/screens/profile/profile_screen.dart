@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 import '../../theme/app_colors.dart';
 import '../../layouts/desktop_layout.dart';
 import '../../utils/responsive.dart';
 import '../../widgets_defaults/diagnostic_item.dart';
 import '../../services/auth_storage.dart';
+import '../../services/diagnostic_service.dart';
+import '../../services/api_config.dart';
+import '../../widgets_defaults/network_avatar_image.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,6 +20,163 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   String _userName = 'Usuário';
   String _userEmail = '';
+  String _userRole = '';
+  String _userPhone = '';
+  String _memberSince = '';
+  String _totalDiagnostics = '--';
+  List<Map<String, dynamic>> _recentDiagnostics = [];
+  Uint8List? _profilePhotoBytes;
+  String? _profilePhotoUrl;
+  bool _photoLoadFailed = false;
+
+  String _formatRole(String role) {
+    final normalized = role.trim().toUpperCase();
+    switch (normalized) {
+      case 'ADMIN':
+        return 'Administrador';
+      case 'ASSISTENTE':
+        return 'Assistente';
+      case 'CLIENTE':
+        return 'Cliente';
+      case 'MECANICO':
+        return 'Mecânico';
+      default:
+        return role.trim().isNotEmpty ? role : 'Não informado';
+    }
+  }
+
+  String _formatDateShort(String isoDate) {
+    try {
+      final dt = DateTime.parse(isoDate);
+      return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+    } catch (_) {
+      return isoDate.trim().isNotEmpty ? isoDate : 'Não informado';
+    }
+  }
+
+  String _formatMemberSince(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) return 'Não informado';
+    try {
+      final dt = DateTime.parse(value);
+      const meses = [
+        'Janeiro',
+        'Fevereiro',
+        'Março',
+        'Abril',
+        'Maio',
+        'Junho',
+        'Julho',
+        'Agosto',
+        'Setembro',
+        'Outubro',
+        'Novembro',
+        'Dezembro',
+      ];
+      return '${meses[dt.month - 1]} ${dt.year}';
+    } catch (_) {
+      return value;
+    }
+  }
+
+  DiagnosticStatus _mapStatus(dynamic rawStatus) {
+    final status = rawStatus?.toString().toUpperCase() ?? '';
+    switch (status) {
+      case 'CONCLUIDO':
+        return DiagnosticStatus.resolved;
+      case 'INCONCLUSIVO':
+        return DiagnosticStatus.urgent;
+      case 'PENDENTE':
+      case 'EM_ANALISE':
+      default:
+        return DiagnosticStatus.pending;
+    }
+  }
+
+  Future<void> _loadRecentDiagnostics() async {
+    final token = await AuthStorage.getToken();
+    if (token == null || token.isEmpty) return;
+
+    final result = await DiagnosticService.buscarMeuHistorico(token: token);
+    if (result['success'] != true) return;
+
+    final List data = result['data'] as List;
+    final recent = data.take(3).map((item) {
+      final map = item as Map<String, dynamic>;
+      final dados = map['dadosParaDiagnostico'] as Map<String, dynamic>? ?? {};
+      final codigo = (dados['codigoODB2'] ?? '').toString();
+      final marca = (dados['marcaVeiculo'] ?? '').toString();
+      final modelo = (dados['modeloVeiculo'] ?? '').toString();
+      final ano = (dados['anoVeiculo'] ?? '').toString();
+      final createdAt = (map['createdAt'] ?? '').toString();
+
+      return {
+        'code': codigo.isNotEmpty ? 'Código: $codigo' : 'Código: -',
+        'vehicle': '$marca $modelo $ano'.trim().isEmpty
+            ? 'Veículo não informado'
+            : '$marca $modelo $ano'.trim(),
+        'date': _formatDateShort(createdAt),
+        'status': _mapStatus(map['status']),
+      };
+    }).toList();
+
+    if (!mounted) return;
+    setState(() {
+      _totalDiagnostics = data.length.toString();
+      _recentDiagnostics = recent;
+    });
+  }
+
+  Uint8List? _decodePhotoBytes(String rawPhoto) {
+    try {
+      final normalized = rawPhoto.trim();
+      if (normalized.isEmpty) return null;
+
+      final commaIndex = normalized.indexOf(',');
+      final base64Part = normalized.startsWith('data:image') && commaIndex > -1
+          ? normalized.substring(commaIndex + 1)
+          : normalized;
+
+      return base64Decode(base64Part);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String? _resolvePhotoUrl(String rawPhoto) {
+    final normalized = rawPhoto.trim();
+    if (normalized.isEmpty) return null;
+    final lower = normalized.toLowerCase();
+
+    final looksLikeImageFile =
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.webp');
+
+    if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+      return normalized;
+    }
+
+    final looksRelativePath =
+        normalized.startsWith('/') ||
+        normalized.startsWith('uploads/') ||
+        normalized.startsWith('images/') ||
+        normalized.startsWith('storage/') ||
+        normalized.contains('/uploads/') ||
+        normalized.contains('/images/');
+
+    if (looksLikeImageFile && !normalized.contains('/')) {
+      return '${ApiConfig.baseUrl}/uploads/$normalized';
+    }
+
+    if (!looksRelativePath) return null;
+    if (normalized.startsWith('/')) {
+      return '${ApiConfig.baseUrl}$normalized';
+    }
+
+    return '${ApiConfig.baseUrl}/$normalized';
+  }
 
   @override
   void initState() {
@@ -25,12 +187,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadUserData() async {
     final name = await AuthStorage.getUserName();
     final email = await AuthStorage.getUserEmail();
+    final photo = await AuthStorage.getUserProfilePhoto();
+    final role = await AuthStorage.getUserRole();
+    final phone = await AuthStorage.getUserPhone();
+    final memberSince = await AuthStorage.getUserMemberSince();
+
+    Uint8List? photoBytes;
+    String? photoUrl;
+    if (photo != null && photo.trim().isNotEmpty) {
+      final normalized = photo.trim();
+      photoUrl = _resolvePhotoUrl(normalized);
+      photoBytes = photoUrl == null ? _decodePhotoBytes(normalized) : null;
+    }
+
     if (mounted) {
       setState(() {
         _userName = name ?? 'Usuário';
         _userEmail = email ?? '';
+        _userRole = role ?? '';
+        _userPhone = phone ?? '';
+        _memberSince = memberSince ?? '';
+        _profilePhotoBytes = photoBytes;
+        _profilePhotoUrl = photoUrl;
+        _photoLoadFailed = false;
       });
     }
+
+    await _loadRecentDiagnostics();
+  }
+
+  Widget _buildProfileAvatar({required double radius}) {
+    if (_profilePhotoBytes != null) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundImage: MemoryImage(_profilePhotoBytes!),
+      );
+    }
+    if (!_photoLoadFailed &&
+        _profilePhotoUrl != null &&
+        _profilePhotoUrl!.isNotEmpty) {
+      return ClipOval(
+        child: SizedBox(
+          width: radius * 2,
+          height: radius * 2,
+          child: NetworkAvatarImage(
+            imageUrl: _profilePhotoUrl!,
+            fit: BoxFit.cover,
+            fallback: Container(
+              color: AppColors.primaryRed,
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.person,
+                size: radius * 1.2,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: AppColors.primaryRed,
+      child: Icon(Icons.person, size: radius * 1.2, color: Colors.white),
+    );
   }
 
   @override
@@ -63,15 +283,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     padding: const EdgeInsets.all(32),
                     child: Column(
                       children: [
-                        const CircleAvatar(
-                          radius: 80,
-                          backgroundColor: AppColors.primaryRed,
-                          child: Icon(
-                            Icons.person,
-                            size: 96,
-                            color: Colors.white,
-                          ),
-                        ),
+                        _buildProfileAvatar(radius: 80),
                         const SizedBox(height: 24),
                         Text(
                           _userName,
@@ -84,46 +296,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         const SizedBox(height: 12),
                         if (_userEmail.isNotEmpty)
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      _userEmail,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.content_copy_outlined,
-                                  size: 18,
-                                ),
-                                onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Email copiado: $_userEmail',
-                                      ),
-                                      duration: const Duration(seconds: 2),
-                                    ),
-                                  );
-                                },
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                              ),
-                            ],
+                          Text(
+                            _userEmail,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         const SizedBox(height: 24),
                         SizedBox(
@@ -186,16 +367,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: _buildInfoCard(
                         icon: Icons.business_center,
                         label: 'Tipo de Conta',
-                        value: 'Proprietário',
+                        value: _formatRole(_userRole),
                         valueColor: AppColors.primaryRed,
                       ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: _buildInfoCard(
-                        icon: Icons.calendar_today,
-                        label: 'Membro desde',
-                        value: 'Janeiro 2026',
+                        icon: Icons.phone,
+                        label: 'Telefone',
+                        value: _userPhone.isNotEmpty
+                            ? _userPhone
+                            : 'Não informado',
                         valueColor: AppColors.primaryRed,
                       ),
                     ),
@@ -204,11 +387,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: _buildInfoCard(
                         icon: Icons.assessment,
                         label: 'Total Diagnóstico',
-                        value: '50',
+                        value: _totalDiagnostics,
                         valueColor: AppColors.primaryRed,
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+                _buildInfoCard(
+                  icon: Icons.calendar_today,
+                  label: 'Membro desde',
+                  value: _formatMemberSince(_memberSince),
+                  valueColor: AppColors.primaryRed,
                 ),
                 const SizedBox(height: 32),
                 Row(
@@ -231,24 +421,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                DiagnosticItem(
-                  code: 'Código: P0301',
-                  vehicle: 'Toyota Corolla 2020',
-                  date: '10/10/2026',
-                  status: DiagnosticStatus.resolved,
-                ),
-                DiagnosticItem(
-                  code: 'Código: P0301',
-                  vehicle: 'Toyota Corolla 2020',
-                  date: '10/10/2026',
-                  status: DiagnosticStatus.pending,
-                ),
-                DiagnosticItem(
-                  code: 'Código: P0301',
-                  vehicle: 'Toyota Corolla 2020',
-                  date: '10/10/2026',
-                  status: DiagnosticStatus.resolved,
-                ),
+                if (_recentDiagnostics.isEmpty)
+                  const Text(
+                    'Nenhum diagnóstico recente.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  )
+                else
+                  ..._recentDiagnostics.map(
+                    (item) => DiagnosticItem(
+                      code: item['code'] as String,
+                      vehicle: item['vehicle'] as String,
+                      date: item['date'] as String,
+                      status: item['status'] as DiagnosticStatus,
+                    ),
+                  ),
                 const SizedBox(height: 32),
                 const Text(
                   'Configurações da Conta',
@@ -328,15 +517,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                const CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.person,
-                    size: 60,
-                    color: AppColors.primaryRed,
-                  ),
-                ),
+                _buildProfileAvatar(radius: 50),
                 const SizedBox(height: 16),
                 Text(
                   _userName,
@@ -348,39 +529,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _userEmail,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Email copiado: $_userEmail'),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                      child: const Icon(
-                        Icons.content_copy_outlined,
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
+                if (_userEmail.isNotEmpty)
+                  Text(
+                    _userEmail,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
               ],
             ),
           ),
@@ -401,21 +557,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildInfoCard(
                   icon: Icons.business_center,
                   label: 'Tipo de Conta',
-                  value: 'Proprietário',
+                  value: _formatRole(_userRole),
                   valueColor: AppColors.primaryRed,
                 ),
                 const SizedBox(height: 12),
                 _buildInfoCard(
-                  icon: Icons.calendar_today,
-                  label: 'Membro desde',
-                  value: 'Janeiro 2026',
+                  icon: Icons.phone,
+                  label: 'Telefone',
+                  value: _userPhone.isNotEmpty ? _userPhone : 'Não informado',
                   valueColor: AppColors.primaryRed,
                 ),
                 const SizedBox(height: 12),
                 _buildInfoCard(
                   icon: Icons.assessment,
                   label: 'Total Diagnóstico',
-                  value: '50',
+                  value: _totalDiagnostics,
+                  valueColor: AppColors.primaryRed,
+                ),
+                const SizedBox(height: 12),
+                _buildInfoCard(
+                  icon: Icons.calendar_today,
+                  label: 'Membro desde',
+                  value: _formatMemberSince(_memberSince),
                   valueColor: AppColors.primaryRed,
                 ),
                 const SizedBox(height: 24),
@@ -445,24 +608,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                DiagnosticItem(
-                  code: 'Código: P0301',
-                  vehicle: 'Toyota Corolla 2020',
-                  date: '10/10/2026',
-                  status: DiagnosticStatus.resolved,
-                ),
-                DiagnosticItem(
-                  code: 'Código: P0301',
-                  vehicle: 'Toyota Corolla 2020',
-                  date: '10/10/2026',
-                  status: DiagnosticStatus.pending,
-                ),
-                DiagnosticItem(
-                  code: 'Código: P0301',
-                  vehicle: 'Toyota Corolla 2020',
-                  date: '10/10/2026',
-                  status: DiagnosticStatus.resolved,
-                ),
+                if (_recentDiagnostics.isEmpty)
+                  const Text(
+                    'Nenhum diagnóstico recente.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  )
+                else
+                  ..._recentDiagnostics.map(
+                    (item) => DiagnosticItem(
+                      code: item['code'] as String,
+                      vehicle: item['vehicle'] as String,
+                      date: item['date'] as String,
+                      status: item['status'] as DiagnosticStatus,
+                    ),
+                  ),
                 const SizedBox(height: 24),
                 const Text(
                   'Configurações da Conta',

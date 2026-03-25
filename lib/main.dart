@@ -18,6 +18,7 @@ void main() async {
   // Inicializza o serviço de logging
   logN.i('App iniciado');
 
+
   runApp(const AutoScanApp());
 }
 

@@ -53,9 +53,7 @@ class AuthStorage {
 
   static dynamic _getLocalStorage() {
     try {
-      return (Uri.base.toString().isNotEmpty)
-          ? _jsLocalStorage()
-          : null;
+      return (Uri.base.toString().isNotEmpty) ? _jsLocalStorage() : null;
     } catch (_) {
       return null;
     }
@@ -77,10 +75,22 @@ class AuthStorage {
     return _get('auth_token');
   }
 
-  static Future<void> saveUser({String? id, String? name, String? email}) async {
+  static Future<void> saveUser({
+    String? id,
+    String? name,
+    String? email,
+    String? profilePhoto,
+    String? role,
+    String? phone,
+    String? memberSince,
+  }) async {
     if (id != null) _set('user_id', id);
     if (name != null) _set('user_name', name);
     if (email != null) _set('user_email', email);
+    if (profilePhoto != null) _set('user_profile_photo', profilePhoto);
+    if (role != null) _set('user_role', role);
+    if (phone != null) _set('user_phone', phone);
+    if (memberSince != null) _set('user_member_since', memberSince);
   }
 
   static Future<String?> getUserName() async {
@@ -95,11 +105,31 @@ class AuthStorage {
     return _get('user_id');
   }
 
+  static Future<String?> getUserProfilePhoto() async {
+    return _get('user_profile_photo');
+  }
+
+  static Future<String?> getUserRole() async {
+    return _get('user_role');
+  }
+
+  static Future<String?> getUserPhone() async {
+    return _get('user_phone');
+  }
+
+  static Future<String?> getUserMemberSince() async {
+    return _get('user_member_since');
+  }
+
   static Future<void> clear() async {
     _remove('auth_token');
     _remove('user_id');
     _remove('user_name');
     _remove('user_email');
+    _remove('user_profile_photo');
+    _remove('user_role');
+    _remove('user_phone');
+    _remove('user_member_since');
   }
 
   static Future<bool> isLoggedIn() async {
