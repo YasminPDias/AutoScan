@@ -185,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
               title: 'Chat com Especialista',
               description: 'Tire dúvidas com IA e mecânicos',
               color: const Color(0xFF1976D2),
-              onTap: () => Navigator.pushNamed(context, '/chat'),
+              onTap: () => Navigator.pushNamed(context, '/history'),
             ),
             _buildEnhancedFeatureCard(
               icon: Icons.description_outlined,
@@ -206,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
               title: 'Suporte 24/7',
               description: 'Assistência sempre disponível',
               color: const Color(0xFF7B1FA2),
-              onTap: () => Navigator.pushNamed(context, '/chat'),
+              onTap: () => Navigator.pushNamed(context, '/history'),
             ),
             _buildEnhancedFeatureCard(
               icon: Icons.trending_up,
@@ -293,7 +293,7 @@ class _HomeScreenState extends State<HomeScreen> {
           title: 'Chat com Especialista',
           description:
               'Tire suas dúvidas com IA ou abra um chamado e aguarde um mecânico especializado',
-          onTap: () => Navigator.pushNamed(context, '/chat'),
+          onTap: () => Navigator.pushNamed(context, '/history'),
         ),
         const SizedBox(height: 20),
         FeatureCard(

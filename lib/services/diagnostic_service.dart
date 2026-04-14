@@ -63,6 +63,30 @@ class DiagnosticService {
     }
   }
 
+  // GET /diagnostico-ia/historico — todos os diagnósticos (ADMIN/ASSISTENTE)
+  static Future<Map<String, dynamic>> buscarTodoHistorico({
+    required String token,
+  }) async {
+    loggerService.d('Buscando todo o histórico de diagnósticos (admin)');
+
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/diagnostico-ia/historico'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    loggerService.d('Resposta todo histórico - Status: ${response.statusCode}');
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final data = jsonDecode(response.body);
+      if (data is List) return {'success': true, 'data': data};
+      return {'success': true, 'data': [data]};
+    }
+    return {'success': false, 'message': 'Status: ${response.statusCode}'};
+  }
+
   static Future<Map<String, dynamic>> buscarMeuHistorico({
     required String token,
   }) async {

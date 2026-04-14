@@ -10,6 +10,7 @@ import 'screens/diagnostic/diagnostic_screen.dart';
 import 'screens/diagnostic/diagnostic_result_screen.dart';
 import 'screens/plans/plans_screen.dart';
 import 'screens/chat/chat_screen.dart';
+import 'screens/chat/chat_history_screen.dart';
 import 'services/logger_service.dart';
 
 void main() async {
@@ -43,6 +44,7 @@ class AutoScanApp extends StatelessWidget {
         '/diagnostic-result': (context) => const DiagnosticResultScreen(),
         '/plans': (context) => const PlansScreen(),
         '/chat': (context) => const ChatScreen(),
+        '/chat-history': (context) => const ChatHistoryScreen(),
       },
     );
   }

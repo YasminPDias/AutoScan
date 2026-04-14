@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import '../theme/app_colors.dart';
 import '../services/auth_storage.dart';
 import '../services/api_config.dart';
+import '../services/chat_read_tracker.dart';
 import 'network_avatar_image.dart';
 
 class AppSidebar extends StatefulWidget {
@@ -18,9 +19,15 @@ class AppSidebar extends StatefulWidget {
 class _AppSidebarState extends State<AppSidebar> {
   String _userName = '';
   String _userEmail = '';
+  String _userRole = '';
   Uint8List? _profilePhotoBytes;
   String? _profilePhotoUrl;
   bool _photoLoadFailed = false;
+
+  bool get _isAdminOrAssistente {
+    final role = _userRole.toUpperCase();
+    return role == 'ADMIN' || role == 'ASSISTENTE';
+  }
 
   Uint8List? _decodePhotoBytes(String rawPhoto) {
     try {
@@ -116,6 +123,7 @@ class _AppSidebarState extends State<AppSidebar> {
     final name = await AuthStorage.getUserName();
     final email = await AuthStorage.getUserEmail();
     final photo = await AuthStorage.getUserProfilePhoto();
+    final role = await AuthStorage.getUserRole();
 
     Uint8List? photoBytes;
     String? photoUrl;
@@ -129,6 +137,7 @@ class _AppSidebarState extends State<AppSidebar> {
       setState(() {
         _userName = name ?? 'Usuário';
         _userEmail = email ?? '';
+        _userRole = role ?? '';
         _profilePhotoBytes = photoBytes;
         _profilePhotoUrl = photoUrl;
         _photoLoadFailed = false;
@@ -203,13 +212,23 @@ class _AppSidebarState extends State<AppSidebar> {
                   label: 'Diagnóstico',
                   route: '/diagnostic',
                 ),
-                _buildNavItem(
-                  context,
-                  icon: Icons.chat_outlined,
-                  activeIcon: Icons.chat,
-                  label: 'Chat',
-                  route: '/chat',
-                ),
+                if (widget.currentRoute == '/chat')
+                  _buildNavItem(
+                    context,
+                    icon: Icons.chat_outlined,
+                    activeIcon: Icons.chat,
+                    label: 'Chat',
+                    route: '/chat',
+                  ),
+                if (_isAdminOrAssistente)
+                  _buildNavItem(
+                    context,
+                    icon: Icons.support_agent_outlined,
+                    activeIcon: Icons.support_agent,
+                    label: 'Atendimentos',
+                    route: '/chat-history',
+                    badge: ChatReadTracker.totalUnread,
+                  ),
                 _buildNavItem(
                   context,
                   icon: Icons.history_outlined,
@@ -299,6 +318,7 @@ class _AppSidebarState extends State<AppSidebar> {
     required IconData activeIcon,
     required String label,
     required String route,
+    int badge = 0,
   }) {
     final isActive = widget.currentRoute == route;
 
@@ -330,16 +350,36 @@ class _AppSidebarState extends State<AppSidebar> {
                       : AppColors.textSecondary,
                 ),
                 const SizedBox(width: 12),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                    color: isActive
-                        ? AppColors.primaryRed
-                        : AppColors.textPrimary,
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight:
+                          isActive ? FontWeight.w600 : FontWeight.normal,
+                      color: isActive
+                          ? AppColors.primaryRed
+                          : AppColors.textPrimary,
+                    ),
                   ),
                 ),
+                if (badge > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryRed,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$badge',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

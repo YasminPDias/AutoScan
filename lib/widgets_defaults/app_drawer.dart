@@ -16,9 +16,15 @@ class AppDrawer extends StatefulWidget {
 class _AppDrawerState extends State<AppDrawer> {
   String _userName = 'Usuário';
   String _userEmail = '';
+  String _userRole = '';
   Uint8List? _profilePhotoBytes;
   String? _profilePhotoUrl;
   bool _photoLoadFailed = false;
+
+  bool get _isAdminOrAssistente {
+    final role = _userRole.toUpperCase();
+    return role == 'ADMIN' || role == 'ASSISTENTE';
+  }
 
   Uint8List? _decodePhotoBytes(String rawPhoto) {
     try {
@@ -118,6 +124,7 @@ class _AppDrawerState extends State<AppDrawer> {
     final name = await AuthStorage.getUserName();
     final email = await AuthStorage.getUserEmail();
     final photo = await AuthStorage.getUserProfilePhoto();
+    final role = await AuthStorage.getUserRole();
 
     Uint8List? photoBytes;
     String? photoUrl;
@@ -131,6 +138,7 @@ class _AppDrawerState extends State<AppDrawer> {
       setState(() {
         _userName = name ?? 'Usuário';
         _userEmail = email ?? '';
+        _userRole = role ?? '';
         _profilePhotoBytes = photoBytes;
         _profilePhotoUrl = photoUrl;
         _photoLoadFailed = false;
@@ -222,6 +230,15 @@ class _AppDrawerState extends State<AppDrawer> {
                     Navigator.pushReplacementNamed(context, '/dashboard');
                   },
                 ),
+                if (_isAdminOrAssistente)
+                  ListTile(
+                    leading: const Icon(Icons.support_agent),
+                    title: const Text('Atendimentos'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushReplacementNamed(context, '/chat-history');
+                    },
+                  ),
                 const Divider(),
                 ListTile(
                   leading: const Icon(Icons.exit_to_app),

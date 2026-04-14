@@ -110,12 +110,6 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
       children: [
         Row(
           children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => Navigator.pop(context),
-              tooltip: 'Voltar',
-            ),
-            const SizedBox(width: 8),
             const Text(
               'Resultado do Diagnóstico',
               style: TextStyle(
@@ -800,7 +794,10 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
                     Navigator.pushNamed(
                       context,
                       '/chat',
-                      arguments: {'diagnostico': diagnostico},
+                      arguments: {
+                        'diagnosticoId': data['id']?.toString() ?? '',
+                        'diagnosticoTexto': diagnostico,
+                      },
                     );
                   },
             icon: const Icon(

@@ -151,12 +151,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     children: [
                       Row(
                         children: [
-                          IconButton(
-                            icon: const Icon(Icons.arrow_back),
-                            onPressed: () => Navigator.pop(context),
-                            tooltip: 'Voltar',
-                          ),
-                          const SizedBox(width: 8),
                           const Text(
                             'Histórico Completo',
                             style: TextStyle(
