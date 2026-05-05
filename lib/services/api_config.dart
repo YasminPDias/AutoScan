@@ -1,6 +1,4 @@
 class ApiConfig {
-  static const String baseUrl =
-      'https://sassoficina-gfb6gwfphefacta6.canadacentral-01.azurewebsites.net';
-  static const String wsUrl =
-      'wss://sassoficina-gfb6gwfphefacta6.canadacentral-01.azurewebsites.net';
+  static const String baseUrl = 'http://187.127.27.216:3000';
+  static const String wsUrl = 'ws://187.127.27.216:3000';
 }
