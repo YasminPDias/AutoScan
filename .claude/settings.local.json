@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(flutter pub:*)",
-      "Bash(flutter analyze:*)"
+      "Bash(flutter analyze:*)",
+      "WebFetch(domain:sassoficina-gfb6gwfphefacta6.canadacentral-01.azurewebsites.net)",
+      "Bash(dir \"c:\\\\Users\\\\yasmi\\\\OneDrive\\\\Documentos\\\\Autex prototipo\" /b)"
     ]
   }
 }

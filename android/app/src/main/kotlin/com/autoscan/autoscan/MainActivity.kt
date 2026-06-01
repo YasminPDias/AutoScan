@@ -1,4 +1,4 @@
-package com.autoscan.autoscan
+package com.autex.autex
 
 import io.flutter.embedding.android.FlutterActivity
 

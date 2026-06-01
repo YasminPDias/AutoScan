@@ -1,14 +1,14 @@
 /// Documentação e exemplos de uso do LoggerService
 ///
 /// Este arquivo serve como referência para usar o sistema de logging
-/// em toda a aplicação AutoScan.
+/// em toda a aplicação Autex.
 ///
 /// EXEMPLOS DE USO:
 /// ================
 ///
 /// 1. Import básico:
 /// ```dart
-/// import 'package:autoscan/services/logger_service.dart';
+/// import 'package:autex/services/logger_service.dart';
 /// ```
 ///
 /// 2. Log de diferentes níveis:
@@ -37,8 +37,8 @@
 ///
 /// 3. Em um serviço:
 /// ```dart
-/// import 'package:autoscan/services/logger_service.dart';
-/// import 'package:autoscan/services/api_service.dart';
+/// import 'package:autex/services/logger_service.dart';
+/// import 'package:autex/services/api_service.dart';
 ///
 /// class DiagnosticService {
 ///   final ApiService _apiService = ApiService();
@@ -66,7 +66,7 @@
 /// 4. Em um Widget/Tela:
 /// ```dart
 /// import 'package:flutter/material.dart';
-/// import 'package:autoscan/services/logger_service.dart';
+/// import 'package:autex/services/logger_service.dart';
 ///
 /// class DashboardScreen extends StatefulWidget {
 ///   const DashboardScreen({super.key});
@@ -116,7 +116,7 @@
 /// Para mudar o nível de logging em tempo de execução:
 /// ```dart
 /// import 'package:logger/logger.dart';
-/// import 'package:autoscan/services/logger_service.dart';
+/// import 'package:autex/services/logger_service.dart';
 ///
 /// // Somente logs de nível INFO e acima
 /// loggerService.setLevel(Level.info);

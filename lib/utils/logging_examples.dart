@@ -13,7 +13,7 @@
 // EXEMPLO 1: Integração em um Serviço
 // ============================================================================
 
-import 'package:autoscan/services/logger_service.dart';
+import 'package:autex/services/logger_service.dart';
 
 class ExampleService {
   /// Realiza uma operação exemplo com logging
@@ -73,7 +73,7 @@ class ExampleService {
 // ============================================================================
 
 import 'package:flutter/material.dart';
-import 'package:autoscan/services/logger_service.dart';
+import 'package:autex/services/logger_service.dart';
 
 class ExampleWidgetScreen extends StatefulWidget {
   const ExampleWidgetScreen({super.key});

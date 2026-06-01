@@ -1,10 +1,10 @@
 import 'package:logger/logger.dart';
 
-/// Serviço centralizado de logging para a aplicação AutoScan
+/// Serviço centralizado de logging para a aplicação Autex
 ///
 /// Exemplo de uso:
 /// ```dart
-/// import 'package:autoscan/services/logger_service.dart';
+/// import 'package:autex/services/logger_service.dart';
 ///
 /// loggerService.d('Mensagem de debug');
 /// loggerService.i('Informação');

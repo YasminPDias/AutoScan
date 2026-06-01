@@ -30,10 +30,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String get _welcomeTitle {
-    if (_userName.isEmpty) return 'Bem-vindo ao AutoScan';
+    if (_userName.isEmpty) return 'Bem-vindo ao Autex';
     final firstName = _userName.split(' ').first.trim();
     return firstName.isEmpty
-        ? 'Bem-vindo ao AutoScan'
+        ? 'Bem-vindo ao Autex'
         : 'Bem-vindo, $firstName';
   }
 

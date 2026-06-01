@@ -273,39 +273,21 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: context.isDesktop ? 140 : 120,
-                        height: context.isDesktop ? 140 : 120,
-                        decoration: BoxDecoration(
-                          color: AppColors.iconBackground,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.border, width: 1),
-                        ),
-                        child: Icon(
-                          Icons.directions_car,
-                          size: context.isDesktop ? 72 : 64,
-                          color: AppColors.textPrimary,
-                        ),
+                      Image.asset(
+                        'lib/assets/Logo Autex.png',
+                        width: context.isDesktop ? 260 : 210,
+                        fit: BoxFit.contain,
                       ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'AutoScan',
-                        style: TextStyle(
-                          fontSize: context.isDesktop ? 32 : 28,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 35),
                       const Text(
-                        'Diagnóstico Inteligentes de Veículos',
+                        'Diagnósticos Inteligentes de Veículos',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 18,
                           color: AppColors.textSecondary,
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 35),
                       TextField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,

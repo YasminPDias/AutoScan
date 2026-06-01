@@ -11,28 +11,30 @@ import 'screens/diagnostic/diagnostic_result_screen.dart';
 import 'screens/plans/plans_screen.dart';
 import 'screens/chat/chat_screen.dart';
 import 'screens/chat/chat_history_screen.dart';
+import 'services/auth_storage.dart';
 import 'services/logger_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AuthStorage.init();
 
-  // Inicializza o serviço de logging
   logN.i('App iniciado');
 
-
-  runApp(const AutoScanApp());
+  final loggedIn = await AuthStorage.isLoggedIn();
+  runApp(AutexApp(initialRoute: loggedIn ? '/home' : '/login'));
 }
 
-class AutoScanApp extends StatelessWidget {
-  const AutoScanApp({super.key});
+class AutexApp extends StatelessWidget {
+  final String initialRoute;
+  const AutexApp({super.key, required this.initialRoute});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AutoScan',
+      title: 'Autex',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      initialRoute: '/login',
+      initialRoute: initialRoute,
       routes: {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),

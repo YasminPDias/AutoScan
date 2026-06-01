@@ -157,32 +157,12 @@ class _AppSidebarState extends State<AppSidebar> {
         children: [
           Container(
             padding: const EdgeInsets.all(24),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.iconBackground,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border, width: 1),
-                  ),
-                  child: const Icon(
-                    Icons.directions_car,
-                    size: 28,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'AutoScan',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
+            child: Center(
+              child: Image.asset(
+                'lib/assets/Logo Autex.png',
+                width: 150,
+                fit: BoxFit.contain,
+              ),
             ),
           ),
           const Divider(height: 1),
@@ -355,8 +335,9 @@ class _AppSidebarState extends State<AppSidebar> {
                     label,
                     style: TextStyle(
                       fontSize: 15,
-                      fontWeight:
-                          isActive ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight: isActive
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                       color: isActive
                           ? AppColors.primaryRed
                           : AppColors.textPrimary,
@@ -366,7 +347,9 @@ class _AppSidebarState extends State<AppSidebar> {
                 if (badge > 0)
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 7, vertical: 2),
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primaryRed,
                       borderRadius: BorderRadius.circular(10),

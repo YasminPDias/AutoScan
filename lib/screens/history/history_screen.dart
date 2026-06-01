@@ -120,7 +120,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 title: const Text('Histórico'),
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back),
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    } else {
+                      Navigator.pushReplacementNamed(context, '/home');
+                    }
+                  },
                 ),
               ),
         body: _isLoading

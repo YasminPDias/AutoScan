@@ -1,6 +1,6 @@
 {
-    "name": "autoscan",
-    "short_name": "autoscan",
+    "name": "Autex",
+    "short_name": "Autex",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

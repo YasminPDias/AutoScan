@@ -1,4 +1,13 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image/image.dart' as img;
+import 'package:record/record.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../layouts/desktop_layout.dart';
 import '../../utils/responsive.dart';
@@ -6,6 +15,7 @@ import '../../services/chat_service.dart';
 import '../../services/auth_storage.dart';
 import '../../services/logger_service.dart';
 import '../../services/websocket_service.dart';
+import '../../services/web_audio_recorder.dart';
 import '../../services/chat_read_tracker.dart';
 import '../../models/mensagem_model.dart';
 
@@ -20,12 +30,19 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final ChatRealtimeService _realtimeService = ChatRealtimeService();
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  final WebAudioRecorder _webAudioRecorder = WebAudioRecorder();
 
   List<MensagemModel> _mensagens = [];
   bool _initialized = false;
   bool _isLoading = true;
   bool _isSending = false;
+  bool _isUploadingImage = false;
+  bool _isRecordingAudio = false;
+  bool _isUploadingAudio = false;
   bool _isEncerrandoConversa = false;
+  Timer? _recordingTimer;
+  int _recordingSeconds = 0;
   String? _conversaId;
   String? _errorMessage;
   String? _myUserId;
@@ -77,7 +94,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
     String? conversaId = conversaIdArg;
 
-    // Aberto sem contexto (ex: clique direto no menu) → redireciona para histórico
     if (conversaId == null && diagnosticoId == null) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -105,9 +121,8 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     _conversaId = conversaId;
-    ChatReadTracker.markRead(conversaId); // marca como lida ao abrir
+    ChatReadTracker.markRead(conversaId);
 
-    // Carrega status da conversa
     final convResult = await ChatService.buscarConversa(
       token: _token!,
       conversaId: conversaId,
@@ -121,7 +136,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
     await _carregarMensagens();
 
-    // Inicia serviço de tempo real (WebSocket + polling fallback)
     _realtimeService.start(
       token: _token!,
       conversaId: conversaId,
@@ -147,7 +161,6 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       },
       onWsMessage: (json) {
-        // Evento de nova mensagem via WebSocket
         if (json['conteudo'] != null || json['content'] != null) {
           try {
             final msg = MensagemModel.fromJson(json);
@@ -161,7 +174,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  /// Verifica se a lista de mensagens mudou (evita rebuilds desnecessários).
   bool _mensagensAlteradas(List<MensagemModel> novas) {
     final confirmadas = _mensagens.where((m) => !m.isPending).toList();
     if (novas.length != confirmadas.length) return true;
@@ -169,13 +181,11 @@ class _ChatScreenState extends State<ChatScreen> {
     return novas.last.id != confirmadas.lastOrNull?.id;
   }
 
-  /// Busca conversa existente para o diagnóstico ou cria uma nova.
   Future<String?> _encontrarOuCriarConversa({
     required String token,
     required String diagnosticoId,
     String? diagnosticoTexto,
   }) async {
-    // 1. Verificar conversas existentes do cliente
     final minhasResult = await ChatService.buscarMinhasConversas(token: token);
     if (minhasResult['success'] == true) {
       final lista = minhasResult['data'] as List;
@@ -188,7 +198,6 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     }
 
-    // 2. Criar nova conversa
     final createResult = await ChatService.criarConversa(
       token: token,
       aiDiagnosticoId: diagnosticoId,
@@ -202,7 +211,6 @@ class _ChatScreenState extends State<ChatScreen> {
     final convId =
         (createResult['data'] as Map<String, dynamic>)['id']?.toString();
 
-    // 3. Enviar primeira mensagem com o texto do diagnóstico
     if (convId != null &&
         diagnosticoTexto != null &&
         diagnosticoTexto.isNotEmpty) {
@@ -210,6 +218,7 @@ class _ChatScreenState extends State<ChatScreen> {
         token: token,
         conversaId: convId,
         conteudo: diagnosticoTexto,
+        usuarioId: _myUserId,
       );
     }
 
@@ -271,6 +280,7 @@ class _ChatScreenState extends State<ChatScreen> {
       token: _token!,
       conversaId: _conversaId!,
       conteudo: texto,
+      usuarioId: _myUserId,
     );
 
     if (!mounted) return;
@@ -364,6 +374,331 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  Future<Uint8List> _comprimirImagem(Uint8List bytes) async {
+    try {
+      final original = img.decodeImage(bytes);
+      if (original == null) return bytes;
+      final resized = img.copyResize(
+        original,
+        width: original.width > 800 ? 800 : original.width,
+      );
+      return Uint8List.fromList(img.encodeJpg(resized, quality: 70));
+    } catch (_) {
+      return bytes;
+    }
+  }
+
+  Future<void> _selecionarEEnviarImagem() async {
+    if (_conversaId == null || _token == null || _isUploadingImage) return;
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png'],
+      withData: true,
+    );
+
+    if (result == null || result.files.single.bytes == null) return;
+
+    final file = result.files.single;
+    if ((file.size) > 5 * 1024 * 1024) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Imagem muito grande. Máximo: 5MB.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    final tempId = 'pending_img_${DateTime.now().millisecondsSinceEpoch}';
+    final msgPendente = MensagemModel(
+      id: tempId,
+      tipo: 'IMAGEM',
+      conteudo: '',
+      createdAt: DateTime.now(),
+      isPending: true,
+    );
+
+    setState(() {
+      _mensagens.add(msgPendente);
+      _isUploadingImage = true;
+    });
+    _scrollToBottom();
+
+    final bytes = await _comprimirImagem(file.bytes!);
+    final fileName = file.name.toLowerCase().endsWith('.png')
+        ? file.name
+        : '${file.name.split('.').first}.jpg';
+
+    final uploadResult = await ChatService.uploadArquivo(
+      token: _token!,
+      bytes: bytes,
+      fileName: fileName,
+    );
+
+    if (!mounted) return;
+
+    if (uploadResult['success'] != true) {
+      setState(() {
+        _mensagens.removeWhere((m) => m.id == tempId);
+        _isUploadingImage = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(uploadResult['message'] ?? 'Erro ao enviar imagem.'),
+          backgroundColor: AppColors.statusUrgent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final midiaUrl =
+        (uploadResult['data'] as Map<String, dynamic>)['url']?.toString();
+
+    if (midiaUrl == null || midiaUrl.isEmpty) {
+      setState(() {
+        _mensagens.removeWhere((m) => m.id == tempId);
+        _isUploadingImage = false;
+      });
+      return;
+    }
+
+    final sendResult = await ChatService.enviarMensagem(
+      token: _token!,
+      conversaId: _conversaId!,
+      tipo: 'IMAGEM',
+      midiaUrl: midiaUrl,
+      usuarioId: _myUserId,
+    );
+
+    if (!mounted) return;
+
+    if (sendResult['success'] == true) {
+      final msgConfirmada = MensagemModel.fromJson(
+        sendResult['data'] as Map<String, dynamic>,
+      );
+      setState(() {
+        _mensagens.removeWhere((m) => m.id == tempId);
+        _mensagens.add(msgConfirmada);
+        _isUploadingImage = false;
+      });
+    } else {
+      setState(() {
+        _mensagens.removeWhere((m) => m.id == tempId);
+        _isUploadingImage = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(sendResult['message'] ?? 'Erro ao enviar imagem.'),
+          backgroundColor: AppColors.statusUrgent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+    _scrollToBottom();
+  }
+
+  // ── Áudio ──────────────────────────────────────────────────────────────────
+
+  void _iniciarTimerGravacao() {
+    _recordingSeconds = 0;
+    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _recordingSeconds++);
+    });
+  }
+
+  void _pararTimerGravacao() {
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+  }
+
+  String _formatarDuracaoGravacao() {
+    final min = (_recordingSeconds ~/ 60).toString().padLeft(2, '0');
+    final sec = (_recordingSeconds % 60).toString().padLeft(2, '0');
+    return '$min:$sec';
+  }
+
+  Future<void> _iniciarGravacao() async {
+    if (_conversaId == null || _token == null || _isUploadingAudio) return;
+
+    try {
+      if (kIsWeb) {
+        await _webAudioRecorder.start();
+      } else {
+        final hasPermission = await _audioRecorder.hasPermission();
+        if (!hasPermission) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Permissão de microfone negada.'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          return;
+        }
+
+        final dir = await getTemporaryDirectory();
+        final path =
+            '${dir.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+        await _audioRecorder.start(
+          const RecordConfig(encoder: AudioEncoder.aacLc),
+          path: path,
+        );
+      }
+
+      if (mounted) {
+        setState(() => _isRecordingAudio = true);
+        _iniciarTimerGravacao();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Falha ao iniciar gravação: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _pararEEnviarAudio() async {
+    _pararTimerGravacao();
+    final Uint8List? webBytes = kIsWeb ? await _webAudioRecorder.stop() : null;
+    final path = kIsWeb ? null : await _audioRecorder.stop();
+
+    if (mounted) setState(() => _isRecordingAudio = false);
+
+    if (path == null && webBytes == null || _conversaId == null || _token == null) return;
+
+    Uint8List bytes;
+    if (kIsWeb) {
+      bytes = webBytes!;
+    } else {
+      try {
+        final file = File(path!);
+        bytes = await file.readAsBytes();
+        await file.delete();
+      } catch (e) {
+        loggerService.e('Erro ao ler arquivo de áudio: $e');
+        return;
+      }
+    }
+
+    final fileName = kIsWeb
+        ? 'audio_${DateTime.now().millisecondsSinceEpoch}.webm'
+        : 'audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    final tempId = 'pending_audio_${DateTime.now().millisecondsSinceEpoch}';
+    final msgPendente = MensagemModel(
+      id: tempId,
+      tipo: 'AUDIO',
+      conteudo: '',
+      createdAt: DateTime.now(),
+      isPending: true,
+    );
+
+    setState(() {
+      _mensagens.add(msgPendente);
+      _isUploadingAudio = true;
+    });
+    _scrollToBottom();
+
+    final uploadResult = await ChatService.uploadArquivo(
+      token: _token!,
+      bytes: bytes,
+      fileName: fileName,
+    );
+
+    if (!mounted) return;
+
+    if (uploadResult['success'] != true) {
+      setState(() {
+        _mensagens.removeWhere((m) => m.id == tempId);
+        _isUploadingAudio = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(uploadResult['message'] ?? 'Erro ao enviar áudio.'),
+          backgroundColor: AppColors.statusUrgent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final midiaUrl =
+        (uploadResult['data'] as Map<String, dynamic>)['url']?.toString();
+
+    if (midiaUrl == null || midiaUrl.isEmpty) {
+      setState(() {
+        _mensagens.removeWhere((m) => m.id == tempId);
+        _isUploadingAudio = false;
+      });
+      return;
+    }
+
+    final sendResult = await ChatService.enviarMensagem(
+      token: _token!,
+      conversaId: _conversaId!,
+      tipo: 'AUDIO',
+      midiaUrl: midiaUrl,
+      usuarioId: _myUserId,
+    );
+
+    if (!mounted) return;
+
+    if (sendResult['success'] == true) {
+      final msgConfirmada = MensagemModel.fromJson(
+        sendResult['data'] as Map<String, dynamic>,
+      );
+      setState(() {
+        _mensagens.removeWhere((m) => m.id == tempId);
+        _mensagens.add(msgConfirmada);
+        _isUploadingAudio = false;
+      });
+    } else {
+      setState(() {
+        _mensagens.removeWhere((m) => m.id == tempId);
+        _isUploadingAudio = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(sendResult['message'] ?? 'Erro ao enviar áudio.'),
+          backgroundColor: AppColors.statusUrgent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+    _scrollToBottom();
+  }
+
+  Future<void> _cancelarGravacao() async {
+    _pararTimerGravacao();
+    if (kIsWeb) {
+      await _webAudioRecorder.cancel();
+    } else {
+      await _audioRecorder.cancel();
+    }
+    if (mounted) setState(() => _isRecordingAudio = false);
+  }
+
+  void _abrirImagemFullscreen(String url) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _ImageViewerPage(url: url),
+        fullscreenDialog: true,
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+
   bool _isMinhaMensagem(MensagemModel msg) {
     if (msg.isPending) return true;
     if (_myUserId == null || _myUserId!.isEmpty) return false;
@@ -384,12 +719,17 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: AppColors.background,
         appBar: context.isDesktop
             ? null
- 
             : AppBar(
                 title: const Text('Chat'),
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back),
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    } else {
+                      Navigator.pushReplacementNamed(context, '/home');
+                    }
+                  },
                 ),
               ),
         body: _isLoading
@@ -434,7 +774,13 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                } else {
+                  Navigator.pushReplacementNamed(context, '/home');
+                }
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryRed,
               ),
@@ -470,6 +816,16 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildBolhaMensagem(MensagemModel msg) {
     final isMeu = _isMinhaMensagem(msg);
 
+    EdgeInsets bubblePadding;
+    if (msg.tipo == 'IMAGEM' && !msg.isPending && msg.midiaUrl != null) {
+      bubblePadding = const EdgeInsets.all(4);
+    } else if (msg.tipo == 'AUDIO' && !msg.isPending && msg.midiaUrl != null) {
+      bubblePadding = const EdgeInsets.symmetric(horizontal: 8, vertical: 10);
+    } else {
+      bubblePadding =
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 10);
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -499,7 +855,6 @@ class _ChatScreenState extends State<ChatScreen> {
               crossAxisAlignment:
                   isMeu ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
-                // Nome do remetente
                 if (!isMeu && msg.usuario != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 4, left: 4),
@@ -524,14 +879,10 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                   ),
-                // Bolha da mensagem
                 Opacity(
                   opacity: msg.isPending ? 0.55 : 1.0,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
+                    padding: bubblePadding,
                     decoration: BoxDecoration(
                       color: isMeu
                           ? AppColors.lightRed
@@ -548,17 +899,9 @@ class _ChatScreenState extends State<ChatScreen> {
                             : AppColors.border,
                       ),
                     ),
-                    child: Text(
-                      msg.conteudo,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textPrimary,
-                        height: 1.45,
-                      ),
-                    ),
+                    child: _buildConteudoBolha(msg, isMeu),
                   ),
                 ),
-                // Hora
                 Padding(
                   padding: const EdgeInsets.only(top: 3, left: 4, right: 4),
                   child: Row(
@@ -603,6 +946,103 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Widget _buildConteudoBolha(MensagemModel msg, bool isMeu) {
+    if (msg.tipo == 'AUDIO') {
+      if (msg.isPending || msg.midiaUrl == null) {
+        return const SizedBox(
+          width: 180,
+          height: 44,
+          child: Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.primaryRed,
+            ),
+          ),
+        );
+      }
+      return _AudioBubble(url: msg.midiaUrl!, isMeu: isMeu);
+    }
+
+    if (msg.tipo == 'IMAGEM') {
+      if (msg.isPending || msg.midiaUrl == null) {
+        return const SizedBox(
+          width: 160,
+          height: 120,
+          child: Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.primaryRed,
+            ),
+          ),
+        );
+      }
+      final rawUrl = msg.midiaUrl!;
+      final imageUrl = rawUrl.startsWith('http')
+          ? rawUrl
+          : 'https://apiautoscan.duckdns.org$rawUrl';
+      loggerService.d('chat image URL: $imageUrl');
+      return GestureDetector(
+        onTap: () => _abrirImagemFullscreen(imageUrl),
+        child: ClipRRect(
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(10),
+            topRight: const Radius.circular(10),
+            bottomLeft: Radius.circular(isMeu ? 10 : 0),
+            bottomRight: Radius.circular(isMeu ? 0 : 10),
+          ),
+          child: Image.network(
+          imageUrl,
+          width: 220,
+          fit: BoxFit.cover,
+          loadingBuilder: (ctx, child, progress) {
+            if (progress == null) return child;
+            return const SizedBox(
+              width: 220,
+              height: 160,
+              child: Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primaryRed,
+                ),
+              ),
+            );
+          },
+          errorBuilder: (ctx, err, stack) {
+            loggerService.e('Falha ao carregar imagem: $imageUrl — $err');
+            return Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(
+                    Icons.broken_image_outlined,
+                    size: 36,
+                    color: AppColors.textLight,
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Imagem indisponível',
+                    style: TextStyle(fontSize: 11, color: AppColors.textLight),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        ),
+      );
+    }
+
+    return Text(
+      msg.conteudo,
+      style: const TextStyle(
+        fontSize: 14,
+        color: AppColors.textPrimary,
+        height: 1.45,
+      ),
+    );
+  }
+
   Widget _buildBannerEncerrada() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -631,6 +1071,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildBarraInput() {
+    if (_isRecordingAudio) return _buildBarraGravando();
+
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: context.isDesktop ? 20 : 16,
@@ -648,6 +1090,45 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // Botão de imagem
+              _isUploadingImage
+                  ? const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.primaryRed,
+                        ),
+                      ),
+                    )
+                  : IconButton(
+                      icon: const Icon(Icons.image_outlined),
+                      onPressed: _selecionarEEnviarImagem,
+                      color: AppColors.textSecondary,
+                      tooltip: 'Enviar imagem',
+                    ),
+              // Botão de microfone
+              _isUploadingAudio
+                  ? const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.primaryRed,
+                        ),
+                      ),
+                    )
+                  : IconButton(
+                      icon: const Icon(Icons.mic_outlined),
+                      onPressed: _iniciarGravacao,
+                      color: AppColors.textSecondary,
+                      tooltip: 'Gravar áudio',
+                    ),
+              const SizedBox(width: 4),
               // Campo de texto
               Expanded(
                 child: Container(
@@ -691,7 +1172,8 @@ class _ChatScreenState extends State<ChatScreen> {
                           decoration: BoxDecoration(
                             color: const Color(0xFFE8F5E9),
                             shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFF388E3C)),
+                            border:
+                                Border.all(color: const Color(0xFF388E3C)),
                           ),
                           child: IconButton(
                             icon: const Icon(
@@ -730,11 +1212,259 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Widget _buildBarraGravando() {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: context.isDesktop ? 20 : 16,
+        vertical: context.isDesktop ? 16 : 12,
+      ),
+      decoration: const BoxDecoration(
+        color: AppColors.cardWhite,
+        border: Border(top: BorderSide(color: AppColors.border, width: 1)),
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            // Cancelar
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: _cancelarGravacao,
+              color: AppColors.textSecondary,
+              tooltip: 'Cancelar',
+            ),
+            // Indicador de gravação
+            Expanded(
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primaryRed,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Gravando...',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    _formatarDuracaoGravacao(),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryRed,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Enviar áudio
+            _isUploadingAudio
+                ? const Padding(
+                    padding: EdgeInsets.all(10),
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primaryRed,
+                      ),
+                    ),
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.send_rounded),
+                    onPressed: _pararEEnviarAudio,
+                    color: AppColors.primaryRed,
+                    tooltip: 'Enviar áudio',
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _realtimeService.stop();
     _messageController.dispose();
     _scrollController.dispose();
+    _recordingTimer?.cancel();
+    _audioRecorder.dispose();
     super.dispose();
+  }
+}
+
+// ── Visualizador de imagem em tela cheia ──────────────────────────────────────
+
+class _ImageViewerPage extends StatelessWidget {
+  final String url;
+
+  const _ImageViewerPage({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+        elevation: 0,
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 5.0,
+          child: Image.network(
+            url,
+            fit: BoxFit.contain,
+            loadingBuilder: (ctx, child, progress) {
+              if (progress == null) return child;
+              return const CircularProgressIndicator(color: Colors.white);
+            },
+            errorBuilder: (ctx, err, stack) => const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48),
+                SizedBox(height: 8),
+                Text('Imagem indisponível', style: TextStyle(color: Colors.white54)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Widget de reprodução de áudio ─────────────────────────────────────────────
+
+class _AudioBubble extends StatefulWidget {
+  final String url;
+  final bool isMeu;
+
+  const _AudioBubble({required this.url, required this.isMeu});
+
+  @override
+  State<_AudioBubble> createState() => _AudioBubbleState();
+}
+
+class _AudioBubbleState extends State<_AudioBubble> {
+  final AudioPlayer _player = AudioPlayer();
+  bool _isPlaying = false;
+  Duration _duration = Duration.zero;
+  Duration _position = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _player.onPlayerStateChanged.listen((state) {
+      if (mounted) setState(() => _isPlaying = state == PlayerState.playing);
+    });
+    _player.onDurationChanged.listen((d) {
+      if (mounted) setState(() => _duration = d);
+    });
+    _player.onPositionChanged.listen((p) {
+      if (mounted) setState(() => _position = p);
+    });
+    _player.onPlayerComplete.listen((_) {
+      if (mounted) setState(() => _position = Duration.zero);
+    });
+  }
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _togglePlay() async {
+    if (_isPlaying) {
+      await _player.pause();
+    } else {
+      final rawUrl = widget.url;
+      final audioUrl = rawUrl.startsWith('http')
+          ? rawUrl
+          : 'https://apiautoscan.duckdns.org$rawUrl';
+      await _player.play(UrlSource(audioUrl));
+    }
+  }
+
+  String _fmt(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.isMeu ? AppColors.primaryRed : AppColors.textPrimary;
+    final progress = _duration.inMilliseconds > 0
+        ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)
+        : 0.0;
+
+    return SizedBox(
+      width: 220,
+      child: Row(
+        children: [
+          IconButton(
+            icon: Icon(
+              _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+            ),
+            color: active,
+            iconSize: 32,
+            onPressed: _togglePlay,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SliderTheme(
+                  data: SliderThemeData(
+                    trackHeight: 2,
+                    thumbShape:
+                        const RoundSliderThumbShape(enabledThumbRadius: 5),
+                    overlayShape:
+                        const RoundSliderOverlayShape(overlayRadius: 8),
+                    activeTrackColor: active,
+                    inactiveTrackColor: active.withValues(alpha: 0.25),
+                    thumbColor: active,
+                    overlayColor: active.withValues(alpha: 0.1),
+                  ),
+                  child: Slider(
+                    value: progress,
+                    onChanged: (v) async {
+                      final pos = Duration(
+                        milliseconds: (v * _duration.inMilliseconds).round(),
+                      );
+                      await _player.seek(pos);
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 2),
+                  child: Text(
+                    '${_fmt(_position)} / ${_fmt(_duration)}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: active.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

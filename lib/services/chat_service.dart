@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'api_config.dart';
 import 'logger_service.dart';
@@ -132,13 +133,45 @@ class ChatService {
     }
   }
 
+  // POST /chat/upload-arquivo — faz upload de um arquivo e retorna a URL
+  static Future<Map<String, dynamic>> uploadArquivo({
+    required String token,
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${ApiConfig.baseUrl}/chat/upload-arquivo'),
+      );
+      request.headers['Authorization'] = 'Bearer $token';
+      request.files.add(
+        http.MultipartFile.fromBytes('arquivo', bytes, filename: fileName),
+      );
+
+      final streamed = await request.send();
+      final body = await streamed.stream.bytesToString();
+
+      loggerService.d('uploadArquivo → ${streamed.statusCode}');
+
+      if (streamed.statusCode == 201 || streamed.statusCode == 200) {
+        return {'success': true, 'data': jsonDecode(body)};
+      }
+      return {'success': false, 'message': _extractError(body)};
+    } catch (e) {
+      loggerService.e('uploadArquivo erro: $e');
+      return {'success': false, 'message': 'Erro ao enviar arquivo: $e'};
+    }
+  }
+
   // POST /chat/enviar — enviar mensagem
   static Future<Map<String, dynamic>> enviarMensagem({
     required String token,
     required String conversaId,
-    required String conteudo,
+    String conteudo = '',
     String tipo = 'TEXTO',
     String? midiaUrl,
+    String? usuarioId,
   }) async {
     try {
       final body = <String, dynamic>{
@@ -147,6 +180,7 @@ class ChatService {
         'tipo': tipo,
       };
       if (midiaUrl != null) body['midiaUrl'] = midiaUrl;
+      if (usuarioId != null && usuarioId.isNotEmpty) body['usuarioId'] = usuarioId;
 
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/chat/enviar'),

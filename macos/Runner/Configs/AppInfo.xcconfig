@@ -5,10 +5,10 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = autoscan
+PRODUCT_NAME = Autex
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.autoscan.autoscan
+PRODUCT_BUNDLE_IDENTIFIER = com.autex.autex
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.autoscan. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 com.autex. All rights reserved.

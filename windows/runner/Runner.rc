@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.autoscan" "\0"
-            VALUE "FileDescription", "autoscan" "\0"
+            VALUE "CompanyName", "com.autex" "\0"
+            VALUE "FileDescription", "Autex" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "autoscan" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.autoscan. All rights reserved." "\0"
-            VALUE "OriginalFilename", "autoscan.exe" "\0"
-            VALUE "ProductName", "autoscan" "\0"
+            VALUE "InternalName", "Autex" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 com.autex. All rights reserved." "\0"
+            VALUE "OriginalFilename", "Autex.exe" "\0"
+            VALUE "ProductName", "Autex" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

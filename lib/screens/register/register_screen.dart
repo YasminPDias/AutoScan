@@ -238,20 +238,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'AutoScan',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
+                    Image.asset(
+                      'lib/assets/Logo Autex.png',
+                      width: 220,
+                      fit: BoxFit.contain,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 18),
                     const Text(
-                      'Diagnóstico Inteligentes de Veículos',
+                      'Diagnósticos Inteligentes de Veículos',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 18,
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -427,25 +424,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         prefixIcon: Icon(Icons.phone_outlined),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      value: _selectedFuncao,
-                      hint: const Text('Selecionar Função'),
-                      items: _funcoes.map((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          _selectedFuncao = newValue;
-                        });
-                      },
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.work_outline),
-                      ),
-                    ),
+                    // const SizedBox(height: 16),
+                    // DropdownButtonFormField<String>(
+                    //   value: _selectedFuncao,
+                    //   hint: const Text('Selecionar Função'),
+                    //   items: _funcoes.map((String value) {
+                    //     return DropdownMenuItem<String>(
+                    //       value: value,
+                    //       child: Text(value),
+                    //     );
+                    //   }).toList(),
+                    //   onChanged: (String? newValue) {
+                    //     setState(() {
+                    //       _selectedFuncao = newValue;
+                    //     });
+                    //   },
+                    //   decoration: const InputDecoration(
+                    //     prefixIcon: Icon(Icons.work_outline),
+                    //   ),
+                    // ),
                     if (_errorMessage != null) ...[
                       const SizedBox(height: 12),
                       Container(
