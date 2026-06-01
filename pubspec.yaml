@@ -98,8 +98,11 @@ flutter:
   # see https://flutter.dev/to/font-from-package
 
 # Configuration for flutter_launcher_icons
-flutter_icons:
+flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "lib/assets/Logo Autex.png"
+  image_path: "lib/assets/icon_autex.png"
   remove_alpha_ios: false
+  web:
+    generate: true
+    image_path: "lib/assets/icon_autex.png"
