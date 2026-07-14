@@ -29,6 +29,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _focusNode = FocusNode();
   final ChatRealtimeService _realtimeService = ChatRealtimeService();
   final AudioRecorder _audioRecorder = AudioRecorder();
   final WebAudioRecorder _webAudioRecorder = WebAudioRecorder();
@@ -290,6 +291,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _isSending = true;
       _messageController.clear();
     });
+    _focusNode.requestFocus();
     _scrollToBottom();
 
     final result = await ChatService.enviarMensagem(
@@ -1165,6 +1167,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   child: TextField(
                     controller: _messageController,
+                    focusNode: _focusNode,
                     decoration: const InputDecoration(
                       hintText: 'Escreva uma mensagem...',
                       border: InputBorder.none,
@@ -1319,6 +1322,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _realtimeService.stop();
     _messageController.dispose();
     _scrollController.dispose();
+    _focusNode.dispose();
     _recordingTimer?.cancel();
     _audioRecorder.dispose();
     super.dispose();

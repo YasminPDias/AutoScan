@@ -6,6 +6,7 @@ import '../../layouts/desktop_layout.dart';
 import '../../utils/responsive.dart';
 import '../../widgets_defaults/diagnostic_item.dart';
 import '../../services/auth_storage.dart';
+import '../../services/auth_service.dart';
 import '../../services/diagnostic_service.dart';
 import '../../services/api_config.dart';
 import '../../widgets_defaults/network_avatar_image.dart';
@@ -319,16 +320,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton.icon(
-                            onPressed: () async {
-                              await AuthStorage.clear();
-                              if (context.mounted) {
-                                Navigator.pushNamedAndRemoveUntil(
-                                  context,
-                                  '/login',
-                                  (route) => false,
-                                );
-                              }
-                            },
+                            onPressed: () => AuthService.logout(context),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.primaryRed,
                               side: const BorderSide(
@@ -666,16 +658,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () async {
-                      await AuthStorage.clear();
-                      if (context.mounted) {
-                        Navigator.pushNamedAndRemoveUntil(
-                          context,
-                          '/login',
-                          (route) => false,
-                        );
-                      }
-                    },
+                    onPressed: () => AuthService.logout(context),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primaryRed,
                       side: const BorderSide(

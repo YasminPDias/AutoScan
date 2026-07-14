@@ -28,6 +28,8 @@ class PushService {
   factory PushService() => _instance;
   PushService._internal();
 
+  String? _tokenAtual;
+
   Future<void> inicializar() async {
     try {
       await FirebaseMessaging.instance.requestPermission();
@@ -40,8 +42,12 @@ class PushService {
       final token = kIsWeb
           ? await FirebaseMessaging.instance.getToken(vapidKey: ApiConfig.vapidKey)
           : await FirebaseMessaging.instance.getToken();
+      _tokenAtual = token;
       if (token != null) await _registrarTokenNoBackend(token);
-      FirebaseMessaging.instance.onTokenRefresh.listen(_registrarTokenNoBackend);
+      FirebaseMessaging.instance.onTokenRefresh.listen((novoToken) {
+        _tokenAtual = novoToken;
+        _registrarTokenNoBackend(novoToken);
+      });
     } catch (e) {
       loggerService.w('Não foi possível obter/registrar o token FCM: $e');
     }
@@ -93,6 +99,32 @@ class PushService {
     final conversaId = message.data['conversaId'];
     if (conversaId != null) {
       navigatorKey.currentState?.pushNamed('/chat', arguments: {'conversaId': conversaId});
+    }
+  }
+
+  /// Chama isso no logout, ANTES de limpar o token de autenticação salvo
+  /// (o DELETE precisa do Bearer ainda válido). Remove o token desse
+  /// dispositivo do backend e invalida ele no Firebase também, pra esse
+  /// aparelho parar de receber push dessa conta a partir de agora.
+  Future<void> desregistrar() async {
+    if (_tokenAtual == null) return;
+
+    try {
+      final authToken = await AuthStorage.getToken();
+      if (authToken != null) {
+        await http.delete(
+          Uri.parse('${ApiConfig.baseUrl}/dispositivos'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $authToken',
+          },
+          body: jsonEncode({'fcmToken': _tokenAtual}),
+        );
+      }
+      await FirebaseMessaging.instance.deleteToken();
+      _tokenAtual = null;
+    } catch (e) {
+      loggerService.w('Falha ao desregistrar token no logout: $e');
     }
   }
 

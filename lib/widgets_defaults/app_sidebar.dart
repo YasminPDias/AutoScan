@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import '../theme/app_colors.dart';
 import '../services/auth_storage.dart';
+import '../services/auth_service.dart';
 import '../services/api_config.dart';
 import '../services/chat_read_tracker.dart';
 import 'network_avatar_image.dart';
@@ -272,16 +273,7 @@ class _AppSidebarState extends State<AppSidebar> {
                 IconButton(
                   icon: const Icon(Icons.logout, size: 20),
                   color: AppColors.textSecondary,
-                  onPressed: () async {
-                    await AuthStorage.clear();
-                    if (context.mounted) {
-                      Navigator.pushNamedAndRemoveUntil(
-                        context,
-                        '/login',
-                        (route) => false,
-                      );
-                    }
-                  },
+                  onPressed: () => AuthService.logout(context),
                   tooltip: 'Sair',
                 ),
               ],

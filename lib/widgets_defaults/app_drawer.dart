@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import '../theme/app_colors.dart';
 import '../services/auth_storage.dart';
+import '../services/auth_service.dart';
 import '../services/api_config.dart';
 import 'network_avatar_image.dart';
 
@@ -243,15 +244,7 @@ class _AppDrawerState extends State<AppDrawer> {
                 ListTile(
                   leading: const Icon(Icons.exit_to_app),
                   title: const Text('Sair'),
-                  onTap: () async {
-                    await AuthStorage.clear();
-                    if (!context.mounted) return;
-                    Navigator.pushNamedAndRemoveUntil(
-                      context,
-                      '/login',
-                      (route) => false,
-                    );
-                  },
+                  onTap: () => AuthService.logout(context),
                 ),
               ],
             ),

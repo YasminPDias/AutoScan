@@ -41,11 +41,10 @@ void main() async {
     }
   }
 
-  // Web: se a página foi aberta a partir de um clique em notificação (o
-  // service worker abriu essa URL com ?conversaId=...), captura aqui — isso
-  // não passa pelo onMessageOpenedApp/getInitialMessage do Dart, que só
-  // funcionam pra clique com o app já rodando.
   final conversaIdDaUrl = kIsWeb ? Uri.base.queryParameters['conversaId'] : null;
+  
+  print('[DEBUG] conversaId lido da URL: $conversaIdDaUrl, loggedIn: $loggedIn');
+  print('[DEBUG] url completa: ${Uri.base.toString()}');
 
   runApp(AutexApp(initialRoute: loggedIn ? '/home' : '/login'));
 

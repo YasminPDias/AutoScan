@@ -1,7 +1,11 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'api_config.dart';
+import 'auth_storage.dart';
 import 'logger_service.dart';
+import 'push_service.dart';
+import 'socket_service.dart';
 
 class AuthService {
   static String _pickString(Map<String, dynamic> source, List<String> keys) {
@@ -415,6 +419,18 @@ class AuthService {
         }
       }
       return {'success': false, 'message': message};
+    }
+  }
+
+  /// Ponto único de logout — desregistra o push, desconecta o socket, limpa
+  /// a sessão salva, e navega pro login. Chama isso em vez de duplicar essas
+  /// quatro etapas em cada tela que tem um botão de sair.
+  static Future<void> logout(BuildContext context) async {
+    await pushService.desregistrar(); // precisa do token ainda válido, por isso vem antes do clear
+    socketService.desconectar();
+    await AuthStorage.clear();
+    if (context.mounted) {
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
     }
   }
 }
