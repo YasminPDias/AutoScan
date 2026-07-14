@@ -7,9 +7,9 @@ class ApiConfig {
   // pelo IP da sua máquina na rede local (ex: 192.168.0.x), ou pelo domínio
   // real quando for testar contra a VPS/produção.
   static String get baseUrl {
-    if (kIsWeb) return 'http://187.127.27.216:3001';
-    if (Platform.isAndroid) return 'http://187.127.27.216:3001';
-    return 'http://187.127.27.216:3001'; // iOS simulator
+    if (kIsWeb) return 'https://apiautoscan.duckdns.org';
+    if (Platform.isAndroid) return 'https://apiautoscan.duckdns.org';
+    return 'https://apiautoscan.duckdns.org'; // iOS simulator
   }
 
   // o cliente socket.io usa esse mesmo host (ele mesmo cuida do protocolo)
