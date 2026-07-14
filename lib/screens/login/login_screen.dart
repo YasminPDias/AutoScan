@@ -4,6 +4,8 @@ import '../../theme/app_colors.dart';
 import '../../utils/responsive.dart';
 import '../../services/auth_service.dart';
 import '../../services/auth_storage.dart';
+import '../../services/socket_service.dart';
+import '../../services/push_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -232,6 +234,12 @@ class _LoginScreenState extends State<LoginScreen> {
           memberSince: userMemberSince.isNotEmpty ? userMemberSince : null,
         );
         if (!mounted) return;
+
+        if (token.isNotEmpty) {
+          socketService.conectar(token);
+          await pushService.inicializar();
+        }
+
         Navigator.pushReplacementNamed(context, '/home');
       } else {
         setState(

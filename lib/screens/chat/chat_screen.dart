@@ -165,6 +165,22 @@ class _ChatScreenState extends State<ChatScreen> {
           try {
             final msg = MensagemModel.fromJson(json);
             if (mounted && !_mensagens.any((m) => m.id == msg.id)) {
+              final senderId = msg.usuario?.id ?? json['usuarioId']?.toString();
+              final isMeu = senderId != null && _myUserId != null && senderId == _myUserId;
+
+              if (isMeu) {
+                final idxPendente = _mensagens.indexWhere((m) =>
+                    m.isPending &&
+                    m.tipo == msg.tipo &&
+                    (m.tipo != 'TEXTO' || m.conteudo == msg.conteudo));
+
+                if (idxPendente != -1) {
+                  setState(() => _mensagens[idxPendente] = msg);
+                  _scrollToBottom();
+                  return;
+                }
+              }
+
               setState(() => _mensagens.add(msg));
               _scrollToBottom();
             }
@@ -291,7 +307,12 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       setState(() {
         _mensagens.removeWhere((m) => m.id == tempId);
-        _mensagens.add(msgConfirmada);
+        // o WS pode ter entregue essa mesma mensagem antes da resposta HTTP
+        // voltar (o backend emite pro socket antes de responder o POST) —
+        // sem essa checagem, ela entraria duas vezes pra quem enviou
+        if (!_mensagens.any((m) => m.id == msgConfirmada.id)) {
+          _mensagens.add(msgConfirmada);
+        }
         _isSending = false;
       });
     } else {
@@ -482,7 +503,9 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       setState(() {
         _mensagens.removeWhere((m) => m.id == tempId);
-        _mensagens.add(msgConfirmada);
+        if (!_mensagens.any((m) => m.id == msgConfirmada.id)) {
+          _mensagens.add(msgConfirmada);
+        }
         _isUploadingImage = false;
       });
     } else {
@@ -658,7 +681,9 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       setState(() {
         _mensagens.removeWhere((m) => m.id == tempId);
-        _mensagens.add(msgConfirmada);
+        if (!_mensagens.any((m) => m.id == msgConfirmada.id)) {
+          _mensagens.add(msgConfirmada);
+        }
         _isUploadingAudio = false;
       });
     } else {

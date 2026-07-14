@@ -1,28 +1,31 @@
 import 'dart:async';
-import 'dart:convert';
-import 'package:web_socket_channel/web_socket_channel.dart';
-import 'api_config.dart';
+import 'socket_service.dart';
 import 'logger_service.dart';
 
 /// Serviço de tempo real para o chat.
 ///
-/// Estratégia dual:
-///   1. Tenta conectar via WebSocket ao servidor.
-///   2. Se a conexão falhar ou o servidor não suportar WS nesse path,
-///      polling HTTP de 5 s mantém as mensagens atualizadas.
-///   3. Quando o WS conecta com sucesso o polling é pausado automaticamente.
+/// Reaproveita a conexão Socket.io compartilhada (SocketService) em vez de
+/// abrir uma conexão própria — só entra/sai da sala da conversa específica.
+/// Mantém a mesma API pública de antes (start/stop/isWsConnected), então
+/// quem já chama esse serviço não precisa mudar nada.
+///
+/// Estratégia dual, igual antes:
+///   1. Entra na sala via Socket.io compartilhado.
+///   2. Se não conectar (ou cair), polling HTTP de 5s mantém atualizado.
+///   3. Quando o WS confirma conexão, o polling é pausado.
 class ChatRealtimeService {
-  WebSocketChannel? _channel;
-  StreamSubscription? _subscription;
+  String? _conversaId;
   Timer? _pollingTimer;
-  Timer? _pingTimer;
+  void Function(Map<String, dynamic>)? _onWsMessageCallback;
   bool _wsConnected = false;
+  Function(dynamic)? _novaMensagemListener;
 
   bool get isWsConnected => _wsConnected;
 
   /// Inicia o serviço para a [conversaId] informada.
   ///
-  /// - [token]: JWT do usuário.
+  /// - [token]: JWT do usuário (usado só se a conexão compartilhada ainda
+  ///   não existir — se já conectada, é reaproveitada como está).
   /// - [onFetch]: função que busca a lista de mensagens via HTTP.
   /// - [onUpdate]: callback chamado com a lista atualizada a cada poll.
   /// - [onWsMessage]: callback opcional para mensagens recebidas via WS.
@@ -33,63 +36,60 @@ class ChatRealtimeService {
     required void Function(List<Map<String, dynamic>>) onUpdate,
     void Function(Map<String, dynamic>)? onWsMessage,
   }) async {
-    _tryWebSocket(token, conversaId, onWsMessage);
+    _conversaId = conversaId;
+    _onWsMessageCallback = onWsMessage;
+
+    // idempotente: se a conexão compartilhada já existe, não abre outra
+    socketService.conectar(token);
+
+    final socket = socketService.socket;
+    if (socket == null) {
+      loggerService.w('Socket indisponível — polling ativo');
+      _startPolling(onFetch, onUpdate);
+      return;
+    }
+
+    socket.emit('entrarChat', conversaId);
+    _wsConnected = socket.connected;
+    if (_wsConnected) {
+      loggerService.i('Entrou na sala da conversa $conversaId (WS já conectado)');
+    }
+
+    _novaMensagemListener = (data) => _handleNovaMensagem(data);
+    socket.on('novaMensagem', _novaMensagemListener!);
+
+    socket.on('connect', (_) {
+      _wsConnected = true;
+      _pollingTimer?.cancel();
+      loggerService.i('WebSocket conectado (conversa $conversaId)');
+      // reenvia entrarChat: se a conexão caiu e reconectou, a sala precisa
+      // ser reafirmada (socket.io não lembra salas entre reconexões)
+      socket.emit('entrarChat', conversaId);
+    });
+
+    socket.on('disconnect', (_) {
+      _wsConnected = false;
+      _startPolling(onFetch, onUpdate);
+    });
+
     _startPolling(onFetch, onUpdate);
   }
 
-  void _tryWebSocket(
-    String token,
-    String conversaId,
-    void Function(Map<String, dynamic>)? onWsMessage,
-  ) {
-    try {
-      // Tenta raw WebSocket. Se o servidor usar Socket.IO,
-      // a conexão será recusada e o polling continuará ativo.
-      final uri = Uri.parse(
-        '${ApiConfig.wsUrl}/chat?token=$token&conversaId=$conversaId',
-      );
+  void _handleNovaMensagem(dynamic data) {
+    if (data is! Map) return;
+    final mensagem = Map<String, dynamic>.from(data);
 
-      _channel = WebSocketChannel.connect(uri);
-
-      _channel!.ready.timeout(const Duration(seconds: 6)).then((_) {
-        _wsConnected = true;
-        _pollingTimer?.cancel();
-        loggerService.i('WebSocket conectado (conversa $conversaId)');
-
-        _pingTimer = Timer.periodic(const Duration(seconds: 25), (_) {
-          if (_wsConnected) {
-            try {
-              _channel?.sink.add(jsonEncode({'event': 'ping'}));
-            } catch (_) {}
-          }
-        });
-      }).catchError((e) {
-        loggerService.w('WebSocket indisponível — polling ativo: $e');
-        _wsConnected = false;
-      });
-
-      _subscription = _channel!.stream.listen(
-        (data) {
-          try {
-            final decoded = jsonDecode(data as String);
-            if (decoded is Map<String, dynamic>) {
-              onWsMessage?.call(decoded);
-            }
-          } catch (_) {}
-        },
-        onError: (e) {
-          loggerService.w('Erro no stream WS: $e');
-          _wsConnected = false;
-        },
-        onDone: () {
-          loggerService.d('WebSocket stream encerrado');
-          _wsConnected = false;
-        },
-        cancelOnError: true,
-      );
-    } catch (e) {
-      loggerService.w('Não foi possível inicializar WebSocket: $e');
+    // TODO: confirma o campo real no MensagemRespostaDTO — chutei os dois
+    // formatos mais prováveis (nested ou flat). Necessário porque a conexão
+    // agora é compartilhada: sem esse filtro, uma 2ª conversa aberta ao
+    // mesmo tempo receberia mensagens uma da outra.
+    final conversaDaMensagem =
+        mensagem['conversaId'] ?? mensagem['conversa']?['id'];
+    if (conversaDaMensagem != null && conversaDaMensagem != _conversaId) {
+      return;
     }
+
+    _onWsMessageCallback?.call(mensagem);
   }
 
   void _startPolling(
@@ -111,12 +111,13 @@ class ChatRealtimeService {
 
   void stop() {
     _pollingTimer?.cancel();
-    _pingTimer?.cancel();
-    _subscription?.cancel();
-    try {
-      _channel?.sink.close();
-    } catch (_) {}
-    _channel = null;
+    final socket = socketService.socket;
+    if (socket != null && _conversaId != null) {
+      socket.emit('sairChat', _conversaId);
+      if (_novaMensagemListener != null) {
+        socket.off('novaMensagem', _novaMensagemListener);
+      }
+    }
     _wsConnected = false;
     loggerService.d('ChatRealtimeService parado');
   }
