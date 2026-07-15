@@ -1,48 +1,49 @@
-/// Rastreia mensagens não lidas por conversa (em memória durante a sessão).
+/// Rastreador de mensagens não lidas por conversa.
 ///
-/// Uso:
-///   - [updateLatest]: chamado ao carregar preview de mensagens
-///   - [markRead]: chamado ao abrir um chat
-///   - [hasUnread]: verifica se há mensagens novas não lidas
-///   - [totalUnread]: total de conversas com mensagens não lidas
+/// Antes: comparava timestamps localmente (heurística — não sabia quem
+/// mandou, nem se foi lida em outro dispositivo).
+///
+/// Agora: cache em memória da contagem real que vem do backend
+/// (GET /conversas/nao-lidas), atualizada:
+///   - ao abrir a lista (ChatHistoryScreen._carregarConversas)
+///   - em tempo real via evento conversaAtualizada (nova mensagem chega)
+///   - ao abrir uma conversa (zera localmente + confirma no backend)
 class ChatReadTracker {
-  ChatReadTracker._();
+  // conversaId -> quantidade de mensagens não lidas
+  static final Map<String, int> _naoLidas = {};
 
-  // conversaId → timestamp da última mensagem conhecida
-  static final Map<String, DateTime> _latestMessage = {};
-
-  // conversaId → timestamp da última vez que o usuário abriu o chat
-  static final Map<String, DateTime> _lastRead = {};
-
-  /// Atualiza o timestamp da mensagem mais recente para uma conversa.
-  static void updateLatest(String conversaId, DateTime messageTime) {
-    final current = _latestMessage[conversaId];
-    if (current == null || messageTime.isAfter(current)) {
-      _latestMessage[conversaId] = messageTime;
+  /// Substitui o mapa inteiro com os dados vindos do backend.
+  /// Chama isso logo após carregar a lista de conversas.
+  static void popularDoBackend(List<Map<String, dynamic>> dados) {
+    _naoLidas.clear();
+    for (final item in dados) {
+      final id = item['conversaId']?.toString();
+      final count = int.tryParse(item['naoLidas']?.toString() ?? '0') ?? 0;
+      if (id != null && count > 0) {
+        _naoLidas[id] = count;
+      }
     }
   }
 
-  /// Marca a conversa como lida agora.
+  /// Chamado quando o evento conversaAtualizada chega via socket —
+  /// incrementa sem precisar rebater na API.
+  static void incrementar(String conversaId) {
+    _naoLidas[conversaId] = (_naoLidas[conversaId] ?? 0) + 1;
+  }
+
+  /// Chamado ao abrir uma conversa — zera localmente na hora (UX imediata).
   static void markRead(String conversaId) {
-    _lastRead[conversaId] = DateTime.now();
+    _naoLidas.remove(conversaId);
   }
 
-  /// Retorna true se há mensagens mais novas do que a última leitura.
+  /// Tem mensagens não lidas nessa conversa?
   static bool hasUnread(String conversaId) {
-    final latest = _latestMessage[conversaId];
-    if (latest == null) return false;
-    final read = _lastRead[conversaId];
-    if (read == null) return true; // nunca aberto
-    return latest.isAfter(read);
+    return (_naoLidas[conversaId] ?? 0) > 0;
   }
 
-  /// Número de conversas com mensagens não lidas.
-  static int get totalUnread =>
-      _latestMessage.keys.where((id) => hasUnread(id)).length;
+  /// Total de conversas com pelo menos uma não lida (pra badge do sidebar).
+  static int get totalUnread => _naoLidas.values.where((n) => n > 0).length;
 
-  /// Limpa todos os dados (ex: ao fazer logout).
-  static void clear() {
-    _latestMessage.clear();
-    _lastRead.clear();
-  }
+  /// Contagem exata de não lidas numa conversa específica.
+  static int countFor(String conversaId) => _naoLidas[conversaId] ?? 0;
 }

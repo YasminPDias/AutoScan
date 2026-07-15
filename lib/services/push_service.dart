@@ -70,10 +70,10 @@ class PushService {
     final tipo = message.data['tipo'];
     final conversaId = message.data['conversaId'] as String?;
 
-    if (tipo == 'nova_mensagem' && conversaId != null) {
-      // atualiza o rastreador de não lidas — qualquer tela de lista que
-      // já use ChatReadTracker.hasUnread() reflete isso automaticamente
-      ChatReadTracker.updateLatest(conversaId, DateTime.now());
+    if (conversaId != null) {
+      // push chegou = usuário não estava vendo essa conversa agora —
+      // incrementa a contagem real de não lidas
+      ChatReadTracker.incrementar(conversaId);
     }
 
     final titulo = message.data['titulo'] as String?;

@@ -26,6 +26,10 @@ class SocketService {
   void Function(Map<String, dynamic>)? onChamadoDisponivel;
   void Function(Map<String, dynamic>)? onConversaReivindicada;
 
+  // callback pra listas/históricos de chat atualizarem sem precisar estar
+  // com aquela conversa especificamente aberta (entrarChat)
+  void Function(Map<String, dynamic>)? onConversaAtualizada;
+
   void conectar(String token) {
     if (_socket != null && _socket!.connected) return; // já conectado
 
@@ -53,6 +57,9 @@ class SocketService {
     _socket!.on('conversaReivindicada', (data) {
       loggerService.i('conversaReivindicada recebido');
       if (data is Map) onConversaReivindicada?.call(Map<String, dynamic>.from(data));
+    });
+    _socket!.on('conversaAtualizada', (data) {
+      if (data is Map) onConversaAtualizada?.call(Map<String, dynamic>.from(data));
     });
   }
 

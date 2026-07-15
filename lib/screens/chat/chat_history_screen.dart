@@ -5,6 +5,7 @@ import '../../utils/responsive.dart';
 import '../../services/chat_service.dart';
 import '../../services/auth_storage.dart';
 import '../../services/chat_read_tracker.dart';
+import '../../services/socket_service.dart';
 import '../../models/conversa_model.dart';
 
 class ChatHistoryScreen extends StatefulWidget {
@@ -29,6 +30,41 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
   void initState() {
     super.initState();
     _carregarConversas();
+
+    // atualiza a lista em tempo real, mesmo sem estar com nenhum chat
+    // específico aberto (não depende de entrarChat) — chega pela sala
+    // pessoal do usuário, que ele sempre está, não importa a tela
+    socketService.onConversaAtualizada = _aoAtualizarConversa;
+  }
+
+  @override
+  void dispose() {
+    // evita que essa callback continue apontando pra um State já destruído
+    if (socketService.onConversaAtualizada == _aoAtualizarConversa) {
+      socketService.onConversaAtualizada = null;
+    }
+    super.dispose();
+  }
+
+  void _aoAtualizarConversa(Map<String, dynamic> data) {
+    if (!mounted) return;
+    final conversaId = data['conversaId']?.toString();
+    if (conversaId == null) return;
+
+    final preview = data['preview']?.toString();
+    final createdAt = DateTime.tryParse(data['createdAt']?.toString() ?? '');
+
+    setState(() {
+      if (preview != null && preview.isNotEmpty) {
+        _previews[conversaId] = preview;
+      }
+      if (createdAt != null) {
+        _ultimasMensagens[conversaId] = createdAt;
+      }
+      // incrementa a contagem real de não lidas (a mensagem chegou via
+      // socket, ou seja, o usuário não estava vendo essa conversa agora)
+      ChatReadTracker.incrementar(conversaId);
+    });
   }
 
   Future<void> _carregarConversas() async {
@@ -60,6 +96,15 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
         final lista = (result['data'] as List)
             .map((j) => ConversaModel.fromJson(j as Map<String, dynamic>))
             .toList();
+
+        // busca a contagem real de não lidas — substitui a heurística local
+        final naoLidasResult = await ChatService.buscarNaoLidas(token: token);
+        if (naoLidasResult['success'] == true) {
+          ChatReadTracker.popularDoBackend(
+            (naoLidasResult['data'] as List).cast<Map<String, dynamic>>(),
+          );
+        }
+
         setState(() {
           _conversas = lista;
           _isLoading = false;
@@ -142,9 +187,6 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
               _ultimasMensagens[conversaId] = ultimaAt;
               _loadingPreview[conversaId] = false;
             });
-
-            // Atualiza o tracker global de não lidas
-            ChatReadTracker.updateLatest(conversaId, ultimaAt);
           }
         } else {
           if (mounted) setState(() => _loadingPreview[conversaId] = false);

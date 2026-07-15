@@ -29,7 +29,6 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final FocusNode _focusNode = FocusNode();
   final ChatRealtimeService _realtimeService = ChatRealtimeService();
   final AudioRecorder _audioRecorder = AudioRecorder();
   final WebAudioRecorder _webAudioRecorder = WebAudioRecorder();
@@ -154,11 +153,12 @@ class _ChatScreenState extends State<ChatScreen> {
         final novas = rawList
             .map((j) => MensagemModel.fromJson(j))
             .toList()
-          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          // mais recente primeiro — combinado com reverse:true na ListView,
+          // isso faz o "início" da lista já ser visualmente o fim da conversa
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
         if (mounted && _mensagensAlteradas(novas)) {
           setState(() => _mensagens = novas);
-          _scrollToBottom();
         }
       },
       onWsMessage: (json) {
@@ -166,27 +166,24 @@ class _ChatScreenState extends State<ChatScreen> {
           try {
             final msg = MensagemModel.fromJson(json);
             if (mounted && !_mensagens.any((m) => m.id == msg.id)) {
-              final senderId = msg.usuario?.id ?? json['usuarioId']?.toString();
-              final isMeu = senderId != null && _myUserId != null && senderId == _myUserId;
-
-              if (isMeu) {
-                final idxPendente = _mensagens.indexWhere((m) =>
-                    m.isPending &&
-                    m.tipo == msg.tipo &&
-                    (m.tipo != 'TEXTO' || m.conteudo == msg.conteudo));
-
-                if (idxPendente != -1) {
-                  setState(() => _mensagens[idxPendente] = msg);
-                  _scrollToBottom();
-                  return;
-                }
-              }
-
-              setState(() => _mensagens.add(msg));
-              _scrollToBottom();
+              // insere no início (index 0), já que a lista agora é mais
+              // recente primeiro
+              setState(() => _mensagens.insert(0, msg));
             }
           } catch (_) {}
         }
+      },
+      onMensagensLidas: (leitorId) {
+        // é o OUTRO participante lendo — marca minhas mensagens enviadas
+        // como lidas (é o mesmo efeito do check azul do WhatsApp)
+        if (leitorId == _myUserId || !mounted) return;
+        setState(() {
+          _mensagens = _mensagens
+              .map((m) => _isMinhaMensagem(m) && m.readAt == null
+                  ? m.copyWith(readAt: DateTime.now())
+                  : m)
+              .toList();
+        });
       },
     );
   }
@@ -195,7 +192,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final confirmadas = _mensagens.where((m) => !m.isPending).toList();
     if (novas.length != confirmadas.length) return true;
     if (novas.isEmpty) return false;
-    return novas.last.id != confirmadas.lastOrNull?.id;
+    return novas.first.id != confirmadas.firstOrNull?.id;
   }
 
   Future<String?> _encontrarOuCriarConversa({
@@ -256,13 +253,14 @@ class _ChatScreenState extends State<ChatScreen> {
       final lista = (result['data'] as List)
           .map((j) => MensagemModel.fromJson(j as Map<String, dynamic>))
           .toList()
-        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        // mais recente primeiro — com reverse:true na ListView, isso já
+        // abre a tela exatamente no fim da conversa, sem scroll manual
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       setState(() {
         _mensagens = lista;
         _isLoading = false;
       });
-      _scrollToBottom();
     } else {
       setState(() {
         _isLoading = false;
@@ -287,12 +285,10 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     setState(() {
-      _mensagens.add(msgPendente);
+      _mensagens.insert(0, msgPendente);
       _isSending = true;
       _messageController.clear();
     });
-    _focusNode.requestFocus();
-    _scrollToBottom();
 
     final result = await ChatService.enviarMensagem(
       token: _token!,
@@ -313,7 +309,7 @@ class _ChatScreenState extends State<ChatScreen> {
         // voltar (o backend emite pro socket antes de responder o POST) —
         // sem essa checagem, ela entraria duas vezes pra quem enviou
         if (!_mensagens.any((m) => m.id == msgConfirmada.id)) {
-          _mensagens.add(msgConfirmada);
+          _mensagens.insert(0, msgConfirmada);
         }
         _isSending = false;
       });
@@ -330,7 +326,6 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       );
     }
-    _scrollToBottom();
   }
 
   Future<void> _encerrarConversa() async {
@@ -385,18 +380,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
   Future<Uint8List> _comprimirImagem(Uint8List bytes) async {
     try {
       final original = img.decodeImage(bytes);
@@ -445,10 +428,9 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     setState(() {
-      _mensagens.add(msgPendente);
+      _mensagens.insert(0, msgPendente);
       _isUploadingImage = true;
     });
-    _scrollToBottom();
 
     final bytes = await _comprimirImagem(file.bytes!);
     final fileName = file.name.toLowerCase().endsWith('.png')
@@ -506,7 +488,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _mensagens.removeWhere((m) => m.id == tempId);
         if (!_mensagens.any((m) => m.id == msgConfirmada.id)) {
-          _mensagens.add(msgConfirmada);
+          _mensagens.insert(0, msgConfirmada);
         }
         _isUploadingImage = false;
       });
@@ -523,7 +505,6 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       );
     }
-    _scrollToBottom();
   }
 
   // ── Áudio ──────────────────────────────────────────────────────────────────
@@ -628,10 +609,9 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     setState(() {
-      _mensagens.add(msgPendente);
+      _mensagens.insert(0, msgPendente);
       _isUploadingAudio = true;
     });
-    _scrollToBottom();
 
     final uploadResult = await ChatService.uploadArquivo(
       token: _token!,
@@ -684,7 +664,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _mensagens.removeWhere((m) => m.id == tempId);
         if (!_mensagens.any((m) => m.id == msgConfirmada.id)) {
-          _mensagens.add(msgConfirmada);
+          _mensagens.insert(0, msgConfirmada);
         }
         _isUploadingAudio = false;
       });
@@ -701,7 +681,6 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       );
     }
-    _scrollToBottom();
   }
 
   Future<void> _cancelarGravacao() async {
@@ -834,6 +813,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return ListView.builder(
       controller: _scrollController,
+      reverse: true,
       padding: EdgeInsets.all(context.isDesktop ? 40 : 20),
       itemCount: _mensagens.length,
       itemBuilder: (context, index) => _buildBolhaMensagem(_mensagens[index]),
@@ -947,6 +927,18 @@ class _ChatScreenState extends State<ChatScreen> {
                           Icons.access_time,
                           size: 10,
                           color: AppColors.textLight,
+                        ),
+                      ],
+                      if (isMeu && !msg.isPending) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          msg.readAt != null
+                              ? Icons.done_all
+                              : Icons.done,
+                          size: 13,
+                          color: msg.readAt != null
+                              ? Colors.blue
+                              : AppColors.textLight,
                         ),
                       ],
                     ],
@@ -1167,7 +1159,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   child: TextField(
                     controller: _messageController,
-                    focusNode: _focusNode,
                     decoration: const InputDecoration(
                       hintText: 'Escreva uma mensagem...',
                       border: InputBorder.none,
@@ -1322,7 +1313,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _realtimeService.stop();
     _messageController.dispose();
     _scrollController.dispose();
-    _focusNode.dispose();
     _recordingTimer?.cancel();
     _audioRecorder.dispose();
     super.dispose();

@@ -242,4 +242,30 @@ class ChatService {
       return body.isNotEmpty ? body : 'Erro desconhecido';
     }
   }
+
+
+  static Future<Map<String, dynamic>> buscarNaoLidas({
+    required String token,
+  }) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/conversas/nao-lidas'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      loggerService.d('buscarNaoLidas → ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {
+          'success': true,
+          'data': data is List ? data : <dynamic>[],
+        };
+      }
+      return {'success': false, 'data': <dynamic>[]};
+    } catch (e) {
+      loggerService.e('buscarNaoLidas erro: $e');
+      return {'success': false, 'data': <dynamic>[]};
+    }
+  }
 }
