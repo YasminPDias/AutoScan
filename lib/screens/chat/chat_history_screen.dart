@@ -89,7 +89,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
         return;
       }
 
-      final result = await ChatService.buscarTodasConversas(token: token);
+      final result = await ChatService.buscarMinhasConversas(token: token);
       if (!mounted) return;
 
       if (result['success'] == true) {

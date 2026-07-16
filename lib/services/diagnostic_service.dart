@@ -1,6 +1,5 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'api_config.dart';
+import 'api_client.dart';
 import 'logger_service.dart';
 
 class DiagnosticService {
@@ -20,13 +19,10 @@ class DiagnosticService {
       '- Código ODB2: $codigoODB2',
     );
 
-    final response = await http.post(
-      Uri.parse('${ApiConfig.baseUrl}/diagnostico-ia/processar'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({
+    final response = await ApiClient.post(
+      '/diagnostico-ia/processar',
+      token: token,
+      body: {
         'codigoODB2': codigoODB2,
         'marcaVeiculo': marcaVeiculo,
         'modeloVeiculo': modeloVeiculo,
@@ -35,7 +31,7 @@ class DiagnosticService {
         'tipoSolicitante': tipoSolicitante,
         'urgencia': urgencia,
         'usuarioId': usuarioId,
-      }),
+      },
     );
 
     loggerService.d('Resposta de diagnóstico - Status: ${response.statusCode}');
@@ -56,8 +52,9 @@ class DiagnosticService {
           message = data['message'] ?? data['error'] ?? message;
         }
       } catch (_) {
-        if (response.body.isNotEmpty)
+        if (response.body.isNotEmpty) {
           message = '${response.statusCode}: ${response.body}';
+        }
       }
       return {'success': false, 'message': message};
     }
@@ -69,12 +66,9 @@ class DiagnosticService {
   }) async {
     loggerService.d('Buscando todo o histórico de diagnósticos (admin)');
 
-    final response = await http.get(
-      Uri.parse('${ApiConfig.baseUrl}/diagnostico-ia/historico'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
+    final response = await ApiClient.get(
+      '/diagnostico-ia/historico',
+      token: token,
     );
 
     loggerService.d('Resposta todo histórico - Status: ${response.statusCode}');
@@ -92,12 +86,9 @@ class DiagnosticService {
   }) async {
     loggerService.d('Buscando histórico de diagnósticos');
 
-    final response = await http.get(
-      Uri.parse('${ApiConfig.baseUrl}/diagnostico-ia/historico/me'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
+    final response = await ApiClient.get(
+      '/diagnostico-ia/historico/me',
+      token: token,
     );
 
     loggerService.d('Resposta de histórico - Status: ${response.statusCode}');
@@ -105,13 +96,8 @@ class DiagnosticService {
     if (response.statusCode == 200 || response.statusCode == 201) {
       final data = jsonDecode(response.body);
       loggerService.i('Histórico de diagnósticos carregado com sucesso');
-      if (data is List) {
-        return {'success': true, 'data': data};
-      }
-      return {
-        'success': true,
-        'data': [data],
-      };
+      if (data is List) return {'success': true, 'data': data};
+      return {'success': true, 'data': [data]};
     } else {
       loggerService.w(
         'Falha ao buscar histórico - Status: ${response.statusCode}',
@@ -123,8 +109,9 @@ class DiagnosticService {
           message = data['message'] ?? data['error'] ?? message;
         }
       } catch (_) {
-        if (response.body.isNotEmpty)
+        if (response.body.isNotEmpty) {
           message = '${response.statusCode}: ${response.body}';
+        }
       }
       return {'success': false, 'message': message};
     }
@@ -139,17 +126,14 @@ class DiagnosticService {
   }) async {
     loggerService.d('Atualizando diagnóstico: $diagnosticoId');
 
-    final response = await http.put(
-      Uri.parse('${ApiConfig.baseUrl}/diagnostico-ia/$diagnosticoId'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({
+    final response = await ApiClient.put(
+      '/diagnostico-ia/$diagnosticoId',
+      token: token,
+      body: {
         'diagnostico': diagnostico,
         'status': status,
         'dadosParaDiagnosticoId': dadosParaDiagnosticoId,
-      }),
+      },
     );
 
     loggerService.d('Resposta de atualização - Status: ${response.statusCode}');
@@ -166,8 +150,9 @@ class DiagnosticService {
           message = data['message'] ?? data['error'] ?? message;
         }
       } catch (_) {
-        if (response.body.isNotEmpty)
+        if (response.body.isNotEmpty) {
           message = '${response.statusCode}: ${response.body}';
+        }
       }
       return {'success': false, 'message': message};
     }
