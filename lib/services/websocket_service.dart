@@ -45,10 +45,9 @@ class ChatRealtimeService {
     _onWsMessageCallback = onWsMessage;
     _onMensagensLidasCallback = onMensagensLidas;
 
-    // idempotente: se a conexão compartilhada já existe, não abre outra
-    socketService.conectar(token);
-
+   socketService.conectar(token);
     final socket = socketService.socket;
+
     if (socket == null) {
       loggerService.w('Socket indisponível — polling ativo');
       _startPolling(onFetch, onUpdate);
@@ -56,6 +55,8 @@ class ChatRealtimeService {
     }
 
     socket.emit('entrarChat', conversaId);
+    loggerService.d('[DEBUG] socket connected: ${socket?.connected}, emitindo entrarChat: $conversaId');
+
     _wsConnected = socket.connected;
     if (_wsConnected) {
       loggerService.i('Entrou na sala da conversa $conversaId (WS já conectado)');

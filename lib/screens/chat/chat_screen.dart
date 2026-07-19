@@ -165,11 +165,16 @@ class _ChatScreenState extends State<ChatScreen> {
         if (json['conteudo'] != null || json['content'] != null) {
           try {
             final msg = MensagemModel.fromJson(json);
-            if (mounted && !_mensagens.any((m) => m.id == msg.id)) {
-              // insere no início (index 0), já que a lista agora é mais
-              // recente primeiro
-              setState(() => _mensagens.insert(0, msg));
-            }
+            if (!mounted || _mensagens.any((m) => m.id == msg.id)) return;
+            // addPostFrameCallback garante que o setState não roda durante
+            // um ciclo de build/layout — evita o assert do Flutter Web
+            // que dispara quando o socket.io entrega eventos em microtask
+            // exatamente no meio de um frame de renderização
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && !_mensagens.any((m) => m.id == msg.id)) {
+                setState(() => _mensagens.insert(0, msg));
+              }
+            });
           } catch (_) {}
         }
       },
@@ -177,12 +182,15 @@ class _ChatScreenState extends State<ChatScreen> {
         // é o OUTRO participante lendo — marca minhas mensagens enviadas
         // como lidas (é o mesmo efeito do check azul do WhatsApp)
         if (leitorId == _myUserId || !mounted) return;
-        setState(() {
-          _mensagens = _mensagens
-              .map((m) => _isMinhaMensagem(m) && m.readAt == null
-                  ? m.copyWith(readAt: DateTime.now())
-                  : m)
-              .toList();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          setState(() {
+            _mensagens = _mensagens
+                .map((m) => _isMinhaMensagem(m) && m.readAt == null
+                    ? m.copyWith(readAt: DateTime.now())
+                    : m)
+                .toList();
+          });
         });
       },
     );
@@ -200,15 +208,15 @@ class _ChatScreenState extends State<ChatScreen> {
     required String diagnosticoId,
     String? diagnosticoTexto,
   }) async {
-    final minhasResult = await ChatService.buscarMinhasConversas(token: token);
+    final minhasResult = await ChatService.buscarConversaPorDiagnosticoId(
+      token: token,
+      diagnosticoId: diagnosticoId,
+    );
     if (minhasResult['success'] == true) {
-      final lista = minhasResult['data'] as List;
-      for (final item in lista) {
-        final conv = item as Map<String, dynamic>;
-        if (conv['aiDiagnosticoId']?.toString() == diagnosticoId) {
-          loggerService.d('Conversa existente: ${conv['id']}');
-          return conv['id']?.toString();
-        }
+      final data = minhasResult['data'] as Map<String, dynamic>;
+      if (data['aiDiagnosticoId']?.toString() == diagnosticoId) {
+        loggerService.d('Conversa existente: ${data['id']}');
+        return data['id']?.toString();
       }
     }
 
@@ -368,7 +376,9 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _isEncerrandoConversa = false);
 
     if (result['success'] == true) {
-      setState(() => _conversaStatus = 'ENCERRADA');
+      setState(() {
+        _conversaStatus = 'ENCERRADA';
+      });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1010,44 +1020,44 @@ class _ChatScreenState extends State<ChatScreen> {
             bottomRight: Radius.circular(isMeu ? 0 : 10),
           ),
           child: Image.network(
-          imageUrl,
-          width: 220,
-          fit: BoxFit.cover,
-          loadingBuilder: (ctx, child, progress) {
-            if (progress == null) return child;
-            return const SizedBox(
-              width: 220,
-              height: 160,
-              child: Center(
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.primaryRed,
+            imageUrl,
+            width: 220,
+            fit: BoxFit.cover,
+            loadingBuilder: (ctx, child, progress) {
+              if (progress == null) return child;
+              return const SizedBox(
+                width: 220,
+                height: 160,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primaryRed,
+                  ),
                 ),
-              ),
-            );
-          },
-          errorBuilder: (ctx, err, stack) {
-            loggerService.e('Falha ao carregar imagem: $imageUrl — $err');
-            return Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(
-                    Icons.broken_image_outlined,
-                    size: 36,
-                    color: AppColors.textLight,
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Imagem indisponível',
-                    style: TextStyle(fontSize: 11, color: AppColors.textLight),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
+              );
+            },
+            errorBuilder: (ctx, err, stack) {
+              loggerService.e('Falha ao carregar imagem: $imageUrl — $err');
+              return Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(
+                      Icons.broken_image_outlined,
+                      size: 36,
+                      color: AppColors.textLight,
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Imagem indisponível',
+                      style: TextStyle(fontSize: 11, color: AppColors.textLight),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       );
     }
@@ -1109,7 +1119,6 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Botão de imagem
               _isUploadingImage
                   ? const Padding(
                       padding: EdgeInsets.all(10),
@@ -1128,7 +1137,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       color: AppColors.textSecondary,
                       tooltip: 'Enviar imagem',
                     ),
-              // Botão de microfone
               _isUploadingAudio
                   ? const Padding(
                       padding: EdgeInsets.all(10),
@@ -1148,7 +1156,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       tooltip: 'Gravar áudio',
                     ),
               const SizedBox(width: 4),
-              // Campo de texto
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1171,7 +1178,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              // Botão "Problema resolvido" — apenas para clientes
               if (_isCliente)
                 Tooltip(
                   message: 'Problema resolvido — encerrar conversa',
@@ -1191,8 +1197,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           decoration: BoxDecoration(
                             color: const Color(0xFFE8F5E9),
                             shape: BoxShape.circle,
-                            border:
-                                Border.all(color: const Color(0xFF388E3C)),
+                            border: Border.all(color: const Color(0xFF388E3C)),
                           ),
                           child: IconButton(
                             icon: const Icon(
@@ -1205,7 +1210,6 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                 ),
               if (_isCliente) const SizedBox(width: 4),
-              // Botão enviar
               _isSending
                   ? const Padding(
                       padding: EdgeInsets.all(10),
@@ -1244,14 +1248,12 @@ class _ChatScreenState extends State<ChatScreen> {
       child: SafeArea(
         child: Row(
           children: [
-            // Cancelar
             IconButton(
               icon: const Icon(Icons.close),
               onPressed: _cancelarGravacao,
               color: AppColors.textSecondary,
               tooltip: 'Cancelar',
             ),
-            // Indicador de gravação
             Expanded(
               child: Row(
                 children: [
@@ -1283,7 +1285,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 ],
               ),
             ),
-            // Enviar áudio
             _isUploadingAudio
                 ? const Padding(
                     padding: EdgeInsets.all(10),

@@ -29,12 +29,12 @@ class ChatService {
     }
   }
 
-  // GET /conversas/cliente/me — conversas do cliente logado
+  // GET /conversas/atendente/me — conversas do cliente logado
   static Future<Map<String, dynamic>> buscarMinhasConversas({
     required String token,
   }) async {
     try {
-      final response = await ApiClient.get('/conversas/cliente/me', token: token);
+      final response = await ApiClient.get('/conversas/atendente/me', token: token);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -97,6 +97,22 @@ class ChatService {
     }
   }
 
+ static Future<Map<String, dynamic>> buscarConversaPorDiagnosticoId({
+    required String token,
+    required String diagnosticoId,
+  }) async {
+    try {
+      final response = await ApiClient.get('/conversas/diagnostico/$diagnosticoId', token: token);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': jsonDecode(response.body)};
+      }
+      return {'success': false, 'message': _extractError(response.body)};
+    } catch (e) {
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+  
   // GET /chat/diagnostico/{conversaId} — mensagens da conversa
   static Future<Map<String, dynamic>> buscarMensagens({
     required String token,
@@ -185,24 +201,22 @@ class ChatService {
     }
   }
 
-  // PATCH /conversas/{id} — encerra a conversa como resolvida
+   // POST /conversas/{id}/encerrar — encerra a conversa e conclui o diagnóstico
+  // só o cliente dono do diagnóstico pode chamar esse endpoint
   static Future<Map<String, dynamic>> encerrarConversa({
     required String token,
     required String conversaId,
   }) async {
     try {
-      final response = await ApiClient.patch(
-        '/conversas/$conversaId',
+      final response = await ApiClient.post(
+        '/conversas/$conversaId/encerrar',
         token: token,
-        body: {'status': 'ENCERRADA'},
       );
-
+ 
       loggerService.d('encerrarConversa → ${response.statusCode}');
-
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        final body =
-            response.body.isNotEmpty ? jsonDecode(response.body) : <String, dynamic>{};
-        return {'success': true, 'data': body};
+ 
+      if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
+        return {'success': true};
       }
       return {'success': false, 'message': _extractError(response.body)};
     } catch (e) {

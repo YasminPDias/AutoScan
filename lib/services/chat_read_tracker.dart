@@ -1,16 +1,27 @@
+import 'package:flutter/foundation.dart';
+
 /// Rastreador de mensagens não lidas por conversa.
 ///
-/// Antes: comparava timestamps localmente (heurística — não sabia quem
-/// mandou, nem se foi lida em outro dispositivo).
-///
-/// Agora: cache em memória da contagem real que vem do backend
+/// Cache em memória da contagem real que vem do backend
 /// (GET /conversas/nao-lidas), atualizada:
 ///   - ao abrir a lista (ChatHistoryScreen._carregarConversas)
-///   - em tempo real via evento conversaAtualizada (nova mensagem chega)
-///   - ao abrir uma conversa (zera localmente + confirma no backend)
+///   - em tempo real via evento conversaAtualizada/novoChamado (socket)
+///   - ao abrir uma conversa (zera localmente)
+///
+/// O [notifier] permite que widgets (ex: AppSidebar) se reconstruam
+/// automaticamente via ValueListenableBuilder quando o tracker muda,
+/// sem precisar de setState ou callbacks manuais.
 class ChatReadTracker {
   // conversaId -> quantidade de mensagens não lidas
   static final Map<String, int> _naoLidas = {};
+
+  /// Escuta esse notifier pra reconstruir automaticamente quando o badge muda.
+  /// Valor = total de conversas com pelo menos uma mensagem não lida.
+  static final ValueNotifier<int> notifier = ValueNotifier<int>(0);
+
+  static void _notificar() {
+    notifier.value = totalUnread;
+  }
 
   /// Substitui o mapa inteiro com os dados vindos do backend.
   /// Chama isso logo após carregar a lista de conversas.
@@ -23,17 +34,20 @@ class ChatReadTracker {
         _naoLidas[id] = count;
       }
     }
+    _notificar();
   }
 
-  /// Chamado quando o evento conversaAtualizada chega via socket —
+  /// Chamado quando chega evento de socket (nova mensagem ou novo chamado) —
   /// incrementa sem precisar rebater na API.
   static void incrementar(String conversaId) {
     _naoLidas[conversaId] = (_naoLidas[conversaId] ?? 0) + 1;
+    _notificar();
   }
 
   /// Chamado ao abrir uma conversa — zera localmente na hora (UX imediata).
   static void markRead(String conversaId) {
     _naoLidas.remove(conversaId);
+    _notificar();
   }
 
   /// Tem mensagens não lidas nessa conversa?

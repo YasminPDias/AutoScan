@@ -6,6 +6,7 @@ import '../services/auth_storage.dart';
 import '../services/auth_service.dart';
 import '../services/api_config.dart';
 import '../services/chat_read_tracker.dart';
+import '../services/socket_service.dart';
 import 'network_avatar_image.dart';
 
 class AppSidebar extends StatefulWidget {
@@ -118,6 +119,25 @@ class _AppSidebarState extends State<AppSidebar> {
   void initState() {
     super.initState();
     _loadUserData();
+
+    // quando chega um novo chamado via socket, incrementa o badge —
+    // o ValueListenableBuilder no build reconstrói automaticamente
+    socketService.onNovoChamado = (data) {
+      final conversaId = data['conversaId']?.toString();
+      if (conversaId != null) ChatReadTracker.incrementar(conversaId);
+    };
+    socketService.onChamadoDisponivel = (data) {
+      final conversaId = data['conversaId']?.toString();
+      if (conversaId != null) ChatReadTracker.incrementar(conversaId);
+    };
+  }
+
+  @override
+  void dispose() {
+    // limpa os callbacks pra não vazar depois que a sidebar for desmontada
+    if (socketService.onNovoChamado != null) socketService.onNovoChamado = null;
+    if (socketService.onChamadoDisponivel != null) socketService.onChamadoDisponivel = null;
+    super.dispose();
   }
 
   Future<void> _loadUserData() async {
@@ -202,13 +222,16 @@ class _AppSidebarState extends State<AppSidebar> {
                     route: '/chat',
                   ),
                 if (_isAdminOrAssistente)
-                  _buildNavItem(
-                    context,
-                    icon: Icons.support_agent_outlined,
-                    activeIcon: Icons.support_agent,
-                    label: 'Atendimentos',
-                    route: '/chat-history',
-                    badge: ChatReadTracker.totalUnread,
+                  ValueListenableBuilder<int>(
+                    valueListenable: ChatReadTracker.notifier,
+                    builder: (context, _, __) => _buildNavItem(
+                      context,
+                      icon: Icons.support_agent_outlined,
+                      activeIcon: Icons.support_agent,
+                      label: 'Atendimentos',
+                      route: '/chat-history',
+                      badge: ChatReadTracker.totalUnread,
+                    ),
                   ),
                 _buildNavItem(
                   context,

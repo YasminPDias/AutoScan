@@ -1,6 +1,9 @@
+import 'package:flutter/material.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'api_config.dart';
+import 'auth_storage.dart';
 import 'logger_service.dart';
+import 'push_service.dart' show navigatorKey;
 
 /// Conexão Socket.io única, compartilhada pelo app inteiro.
 ///
@@ -44,7 +47,25 @@ class SocketService {
 
     _socket!.on('connect', (_) => loggerService.i('Socket conectado'));
     _socket!.on('disconnect', (_) => loggerService.w('Socket desconectado'));
-    _socket!.on('connect_error', (e) => loggerService.e('Erro de conexão do socket: $e'));
+    _socket!.on('connect_error', (e) {
+      loggerService.e('Erro de conexão do socket: $e');
+
+      // se o erro for de sessão encerrada (token inválido ou expirado no Redis),
+      // redireciona pro login — mesmo caminho que o ApiClient usa no 401
+      final mensagem = e?.toString() ?? '';
+      if (mensagem.contains('Sessão encerrada') ||
+          mensagem.contains('Token inválido') ||
+          mensagem.contains('Token não fornecido')) {
+        _redirecionarParaLogin(mensagem);
+      }
+    });
+
+    // backend emite isso antes de desconectar forçadamente quando um novo
+    // login acontece em outro dispositivo — faz logout automático aqui
+    _socket!.on('sessaoEncerrada', (data) {
+      loggerService.w('Sessão encerrada remotamente: $data');
+      _fazerLogoutAutomatico();
+    });
 
     _socket!.on('novoChamado', (data) {
       loggerService.i('novoChamado recebido');
@@ -68,6 +89,26 @@ class SocketService {
     _socket?.dispose();
     _socket = null;
   }
+
+  Future<void> _redirecionarParaLogin([String? motivo]) async {
+    desconectar();
+    await AuthStorage.clear();
+    final context = navigatorKey.currentContext;
+    if (context != null && context.mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/login',
+        (route) => false,
+        arguments: {
+          'mensagemErro': motivo?.isNotEmpty == true
+              ? motivo
+              : 'Sua sessão foi encerrada. Faça login novamente.',
+        },
+      );
+    }
+  }
+
+  // mantido por compatibilidade — agora delega pro _redirecionarParaLogin
+  Future<void> _fazerLogoutAutomatico() => _redirecionarParaLogin();
 }
 
 final socketService = SocketService();

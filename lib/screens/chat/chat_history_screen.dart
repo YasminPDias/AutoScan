@@ -20,26 +20,15 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
   String? _errorMessage;
   List<ConversaModel> _conversas = [];
 
-  // Dados carregados em background por conversa
-  final Map<String, String> _clienteNomes = {};
-  final Map<String, String> _previews = {};
-  final Map<String, DateTime> _ultimasMensagens = {};
-  final Map<String, bool> _loadingPreview = {};
-
   @override
   void initState() {
     super.initState();
     _carregarConversas();
-
-    // atualiza a lista em tempo real, mesmo sem estar com nenhum chat
-    // específico aberto (não depende de entrarChat) — chega pela sala
-    // pessoal do usuário, que ele sempre está, não importa a tela
     socketService.onConversaAtualizada = _aoAtualizarConversa;
   }
 
   @override
   void dispose() {
-    // evita que essa callback continue apontando pra um State já destruído
     if (socketService.onConversaAtualizada == _aoAtualizarConversa) {
       socketService.onConversaAtualizada = null;
     }
@@ -51,18 +40,32 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
     final conversaId = data['conversaId']?.toString();
     if (conversaId == null) return;
 
-    final preview = data['preview']?.toString();
-    final createdAt = DateTime.tryParse(data['createdAt']?.toString() ?? '');
-
     setState(() {
-      if (preview != null && preview.isNotEmpty) {
-        _previews[conversaId] = preview;
-      }
-      if (createdAt != null) {
-        _ultimasMensagens[conversaId] = createdAt;
-      }
-      // incrementa a contagem real de não lidas (a mensagem chegou via
-      // socket, ou seja, o usuário não estava vendo essa conversa agora)
+      // atualiza o preview na lista em tempo real sem rebater na API
+      _conversas = _conversas.map((conv) {
+        if (conv.id != conversaId) return conv;
+        final preview = data['preview']?.toString() ?? '';
+        final createdAt = DateTime.tryParse(data['createdAt']?.toString() ?? '');
+        final ultimaMensagem = preview.isNotEmpty && createdAt != null
+            ? UltimaMensagem(
+                id: '',
+                conteudo: preview,
+                tipo: 'TEXTO',
+                createdAt: createdAt,
+              )
+            : conv.ultimaMensagem;
+        return ConversaModel(
+          id: conv.id,
+          aiDiagnosticoId: conv.aiDiagnosticoId,
+          status: conv.status,
+          clienteNome: conv.clienteNome,
+          clienteId: conv.clienteId,
+          atendenteNome: conv.atendenteNome,
+          atendenteId: conv.atendenteId,
+          createdAt: conv.createdAt,
+          ultimaMensagem: ultimaMensagem,
+        );
+      }).toList();
       ChatReadTracker.incrementar(conversaId);
     });
   }
@@ -71,10 +74,6 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
-      _clienteNomes.clear();
-      _previews.clear();
-      _ultimasMensagens.clear();
-      _loadingPreview.clear();
     });
 
     try {
@@ -97,7 +96,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
             .map((j) => ConversaModel.fromJson(j as Map<String, dynamic>))
             .toList();
 
-        // busca a contagem real de não lidas — substitui a heurística local
+        // popula o tracker com dados reais do backend (uma só requisição)
         final naoLidasResult = await ChatService.buscarNaoLidas(token: token);
         if (naoLidasResult['success'] == true) {
           ChatReadTracker.popularDoBackend(
@@ -109,10 +108,6 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
           _conversas = lista;
           _isLoading = false;
         });
-
-        for (final conv in lista) {
-          _carregarPreview(token, conv.id);
-        }
       } else {
         setState(() {
           _isLoading = false;
@@ -130,78 +125,9 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
     }
   }
 
-  Future<void> _carregarPreview(String token, String conversaId) async {
-    if (!mounted) return;
-    setState(() => _loadingPreview[conversaId] = true);
-
-    try {
-      final result = await ChatService.buscarMensagens(
-        token: token,
-        conversaId: conversaId,
-      );
-
-      if (!mounted) return;
-
-      if (result['success'] == true) {
-        final msgs = result['data'] as List;
-        if (msgs.isNotEmpty) {
-          final sorted = List<Map<String, dynamic>>.from(
-            msgs.map((m) => m as Map<String, dynamic>),
-          )..sort((a, b) {
-              final da = DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
-                  DateTime(2000);
-              final db = DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
-                  DateTime(2000);
-              return da.compareTo(db);
-            });
-
-          // Nome do cliente = remetente da primeira mensagem
-          final primeira = sorted.first;
-          final usuario =
-              primeira['usuario'] as Map<String, dynamic>?;
-          if (usuario != null) {
-            final n = usuario['nome']?.toString() ?? '';
-            final s = usuario['sobrenome']?.toString() ??
-                usuario['lastName']?.toString() ??
-                '';
-            final nome = '$n $s'.trim();
-            if (nome.isNotEmpty && mounted) {
-              setState(() => _clienteNomes[conversaId] = nome);
-            }
-          }
-
-          // Preview = ÚLTIMA mensagem (mais recente)
-          final ultima = sorted.last;
-          final conteudo = ultima['conteudo']?.toString() ?? '';
-          final preview =
-              conteudo.length > 90 ? '${conteudo.substring(0, 90)}…' : conteudo;
-
-          // Timestamp da última mensagem para rastrear não lidas
-          final ultimaAt = DateTime.tryParse(
-                  ultima['createdAt']?.toString() ?? '') ??
-              DateTime.now();
-
-          if (mounted) {
-            setState(() {
-              if (preview.isNotEmpty) _previews[conversaId] = preview;
-              _ultimasMensagens[conversaId] = ultimaAt;
-              _loadingPreview[conversaId] = false;
-            });
-          }
-        } else {
-          if (mounted) setState(() => _loadingPreview[conversaId] = false);
-        }
-      } else {
-        if (mounted) setState(() => _loadingPreview[conversaId] = false);
-      }
-    } catch (_) {
-      if (mounted) setState(() => _loadingPreview[conversaId] = false);
-    }
-  }
-
   void _abrirConversa(String conversaId) {
     ChatReadTracker.markRead(conversaId);
-    setState(() {}); // atualiza badge imediatamente
+    setState(() {});
     Navigator.pushNamed(
       context,
       '/chat',
@@ -241,10 +167,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                     SizedBox(height: 16),
                     Text(
                       'Carregando atendimentos...',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textSecondary,
-                      ),
+                      style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -297,15 +220,11 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
             ),
             Text(
               '${_conversas.length} conversa${_conversas.length != 1 ? 's' : ''}',
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-              ),
+              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
           ],
         ),
         const SizedBox(width: 12),
-        // Badge de não lidas no header
         if (totalNaoLidas > 0)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -343,14 +262,12 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
       ),
       child: Row(
         children: [
-          const Icon(
-              Icons.error_outline, color: AppColors.primaryRed, size: 20),
+          const Icon(Icons.error_outline, color: AppColors.primaryRed, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               _errorMessage!,
-              style:
-                  const TextStyle(fontSize: 13, color: AppColors.primaryRed),
+              style: const TextStyle(fontSize: 13, color: AppColors.primaryRed),
             ),
           ),
           TextButton(
@@ -422,8 +339,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
             child: Column(
               children: List.generate(
                 total - metade,
-                (i) => _buildItemConversa(
-                    _conversas[metade + i], metade + i + 1),
+                (i) => _buildItemConversa(_conversas[metade + i], metade + i + 1),
               ),
             ),
           ),
@@ -440,11 +356,9 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
   }
 
   Widget _buildItemConversa(ConversaModel conv, int numero) {
-    final isLoadingPreview = _loadingPreview[conv.id] ?? false;
-    final nomeCliente = _clienteNomes[conv.id];
-    final preview = _previews[conv.id];
-    final ultimaAt = _ultimasMensagens[conv.id];
     final temNaoLida = ChatReadTracker.hasUnread(conv.id);
+    final ultima = conv.ultimaMensagem;
+    final nomeCliente = conv.clienteNome;
 
     final accentColors = [
       AppColors.primaryRed,
@@ -486,8 +400,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                     bottomLeft: Radius.circular(11),
                   ),
                   border: Border(
-                    right: BorderSide(
-                        color: accentColor.withValues(alpha: 0.2)),
+                    right: BorderSide(color: accentColor.withValues(alpha: 0.2)),
                   ),
                 ),
                 child: Center(
@@ -505,12 +418,11 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
               // Conteúdo principal
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Nome + badge de não lida
+                      // Nome + badge
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
@@ -518,25 +430,22 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                               size: 15, color: AppColors.textSecondary),
                           const SizedBox(width: 5),
                           Expanded(
-                            child: isLoadingPreview && nomeCliente == null
-                                ? _buildSkeletonLine(
-                                    width: 140, height: 13)
-                                : Text(
-                                    nomeCliente ?? 'Sem identificação',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: temNaoLida
-                                          ? FontWeight.w700
-                                          : FontWeight.w600,
-                                      color: nomeCliente != null
-                                          ? AppColors.textPrimary
-                                          : AppColors.textLight,
-                                      fontStyle: nomeCliente != null
-                                          ? FontStyle.normal
-                                          : FontStyle.italic,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                            child: Text(
+                              nomeCliente ?? 'Sem identificação',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: temNaoLida
+                                    ? FontWeight.w700
+                                    : FontWeight.w600,
+                                color: nomeCliente != null
+                                    ? AppColors.textPrimary
+                                    : AppColors.textLight,
+                                fontStyle: nomeCliente != null
+                                    ? FontStyle.normal
+                                    : FontStyle.italic,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                           if (temNaoLida) ...[
                             const SizedBox(width: 8),
@@ -565,12 +474,13 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
 
                       const SizedBox(height: 6),
 
-                      // Preview da última mensagem
-                      if (isLoadingPreview && preview == null)
-                        _buildSkeletonLine(width: double.infinity, height: 11)
-                      else if (preview != null)
+                      // Preview da última mensagem — vem direto do model, sem request extra
+                      if (ultima != null)
                         Text(
-                          preview,
+                          // mostra quem mandou se não for o cliente
+                          ultima.remetenteId != conv.clienteId && ultima.remetenteNome != null
+                              ? '${ultima.remetenteNome}: ${ultima.preview}'
+                              : ultima.preview,
                           style: TextStyle(
                             fontSize: 12,
                             color: temNaoLida
@@ -605,22 +515,13 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                             color: accentColor.withValues(alpha: 0.7),
                           ),
                           const SizedBox(width: 4),
-                          Text(
-                            _formatarId(conv.id),
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: accentColor,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                          if (ultimaAt != null) ...[
+                          if (ultima != null) ...[
                             const SizedBox(width: 10),
                             const Icon(Icons.access_time,
                                 size: 11, color: AppColors.textLight),
                             const SizedBox(width: 3),
                             Text(
-                              _formatarData(ultimaAt.toIso8601String()),
+                              _formatarData(ultima.createdAt.toIso8601String()),
                               style: const TextStyle(
                                 fontSize: 11,
                                 color: AppColors.textLight,
@@ -634,7 +535,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
                 ),
               ),
 
-              // Indicador de não lida (ponto) + seta
+              // Indicador de não lida + seta
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Column(
@@ -663,33 +564,22 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
     );
   }
 
-  Widget _buildSkeletonLine({required double width, required double height}) {
-    return Container(
-      width: width,
-      height: height,
-      margin: const EdgeInsets.symmetric(vertical: 2),
-      decoration: BoxDecoration(
-        color: AppColors.iconBackground,
-        borderRadius: BorderRadius.circular(4),
-      ),
-    );
-  }
-
   Widget _buildBadgeStatus(String status) {
     Color cor;
     String label;
     switch (status.toUpperCase()) {
-      case 'ABERTA':
-      case 'OPEN':
-      case 'ATIVA':
-        cor = AppColors.statusResolved;
-        label = 'Aberta';
+      case 'AGUARDANDO':
+        cor = AppColors.statusPending;
+        label = 'Aguardando';
         break;
-      case 'FECHADA':
-      case 'CLOSED':
+      case 'EM_ATENDIMENTO':
+        cor = const Color(0xFF1976D2);
+        label = 'Em atendimento';
+        break;
       case 'ENCERRADA':
+      case 'CONCLUIDA':
         cor = AppColors.textLight;
-        label = 'Fechada';
+        label = 'Encerrada';
         break;
       default:
         cor = AppColors.statusPending;
@@ -702,8 +592,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
         const SizedBox(width: 4),
         Text(
           label,
-          style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w600, color: cor),
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: cor),
         ),
       ],
     );
@@ -720,14 +609,10 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
       final dt = DateTime.parse(isoDate).toLocal();
       final hoje = DateTime.now();
       final ontem = hoje.subtract(const Duration(days: 1));
-      if (dt.year == hoje.year &&
-          dt.month == hoje.month &&
-          dt.day == hoje.day) {
+      if (dt.year == hoje.year && dt.month == hoje.month && dt.day == hoje.day) {
         return 'Hoje ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
       }
-      if (dt.year == ontem.year &&
-          dt.month == ontem.month &&
-          dt.day == ontem.day) {
+      if (dt.year == ontem.year && dt.month == ontem.month && dt.day == ontem.day) {
         return 'Ontem ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
       }
       return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
