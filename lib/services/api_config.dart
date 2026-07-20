@@ -6,9 +6,9 @@ class ApiConfig {
 
   // Base HTTP da API.
   static String get baseUrl {
-    if (kIsWeb) return _host;
-    if (Platform.isAndroid) return _host;
-    return _host;
+    if (kIsWeb) return 'http://187.127.27.216:3001';
+    if (Platform.isAndroid) return 'http://187.127.27.216:3001';
+    return 'http://187.127.27.216:3001'; // iOS simulator
   }
 
   // Socket.io usa o host raiz, sem /api.

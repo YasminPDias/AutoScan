@@ -32,6 +32,7 @@ class MensagemModel {
   final DateTime createdAt;
   final MensagemUsuario? usuario;
   final bool isPending;
+  final DateTime? readAt;
 
   MensagemModel({
     required this.id,
@@ -41,6 +42,7 @@ class MensagemModel {
     required this.createdAt,
     this.usuario,
     this.isPending = false,
+    this.readAt,
   });
 
   factory MensagemModel.fromJson(Map<String, dynamic> json) {
@@ -55,10 +57,14 @@ class MensagemModel {
       usuario: json['usuario'] != null
           ? MensagemUsuario.fromJson(json['usuario'] as Map<String, dynamic>)
           : null,
+      // backend manda readAt como Date/string ISO, ou null se ainda não foi lida
+      readAt: json['readAt'] != null
+          ? DateTime.tryParse(json['readAt'].toString())
+          : null,
     );
   }
 
-  MensagemModel copyWith({bool? isPending}) {
+  MensagemModel copyWith({bool? isPending, DateTime? readAt}) {
     return MensagemModel(
       id: id,
       tipo: tipo,
@@ -67,6 +73,7 @@ class MensagemModel {
       createdAt: createdAt,
       usuario: usuario,
       isPending: isPending ?? this.isPending,
+      readAt: readAt ?? this.readAt,
     );
   }
 }

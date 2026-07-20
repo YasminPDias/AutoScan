@@ -67,30 +67,65 @@ class PushService {
   }
 
   void _tratarPushEmForeground(RemoteMessage message) {
-    final tipo = message.data['tipo'];
     final conversaId = message.data['conversaId'] as String?;
-
-    if (tipo == 'nova_mensagem' && conversaId != null) {
-      // atualiza o rastreador de não lidas — qualquer tela de lista que
-      // já use ChatReadTracker.hasUnread() reflete isso automaticamente
-      ChatReadTracker.updateLatest(conversaId, DateTime.now());
-    }
-
     final titulo = message.data['titulo'] as String?;
     final corpo = message.data['corpo'] as String?;
+
+    if (conversaId != null) {
+      ChatReadTracker.incrementar(conversaId);
+    }
+
     if (titulo == null) return;
 
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+
+    _mostrarNotificacaoOverlay(
+      context: context,
+      titulo: titulo,
+      corpo: corpo,
+      conversaId: conversaId,
+    );
+  }
+
+  void _mostrarNotificacaoOverlay({
+    required BuildContext context,
+    required String titulo,
+    String? corpo,
+    String? conversaId,
+  }) {
+    scaffoldMessengerKey.currentState?.clearSnackBars();
     scaffoldMessengerKey.currentState?.showSnackBar(
       SnackBar(
-        content: Text(corpo != null && corpo.isNotEmpty ? '$titulo: $corpo' : titulo),
+        // duração generosa — o X fecha antes se o usuário quiser
+        duration: const Duration(seconds: 6),
+        // padding zero pra o widget customizado preencher tudo
+        padding: EdgeInsets.zero,
+        // fundo transparente — a cor vem do Container interno
+        backgroundColor: Colors.transparent,
+        // sem sombra própria do SnackBar — a do Container já faz isso
+        elevation: 0,
         behavior: SnackBarBehavior.floating,
-        action: conversaId != null
-            ? SnackBarAction(
-                label: 'Ver',
-                onPressed: () => navigatorKey.currentState
-                    ?.pushNamed('/chat', arguments: {'conversaId': conversaId}),
-              )
-            : null,
+        margin: const EdgeInsets.only(
+          left: 16,
+          right: 16,
+          bottom: 16,
+        ),
+        content: _AutexToastContent(
+          titulo: titulo,
+          corpo: corpo,
+          conversaId: conversaId,
+          onVerPressed: conversaId != null
+              ? () {
+                  scaffoldMessengerKey.currentState?.clearSnackBars();
+                  navigatorKey.currentState?.pushNamed(
+                    '/chat',
+                    arguments: {'conversaId': conversaId},
+                  );
+                }
+              : null,
+          onDismiss: () => scaffoldMessengerKey.currentState?.clearSnackBars(),
+        ),
       ),
     );
   }
@@ -152,3 +187,136 @@ class PushService {
 }
 
 final pushService = PushService();
+
+/// Conteúdo do toast de notificação no estilo Autex.
+/// Usado dentro de um SnackBar customizado — fundo branco,
+/// borda esquerda vermelha, ícone de chat, botão "Ver" e X pra fechar.
+class _AutexToastContent extends StatelessWidget {
+  final String titulo;
+  final String? corpo;
+  final String? conversaId;
+  final VoidCallback? onVerPressed;
+  final VoidCallback onDismiss;
+
+  const _AutexToastContent({
+    required this.titulo,
+    this.corpo,
+    this.conversaId,
+    this.onVerPressed,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE8E8E8)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.10),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // barra vermelha esquerda
+            Container(
+              width: 4,
+              decoration: const BoxDecoration(
+                color: Color(0xFFDC143C),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  bottomLeft: Radius.circular(12),
+                ),
+              ),
+            ),
+            // ícone
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC143C).withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  color: Color(0xFFDC143C),
+                  size: 18,
+                ),
+              ),
+            ),
+            // texto
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 14, bottom: 14, right: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      titulo,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (corpo != null && corpo!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        corpo!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF6B6B6B),
+                          height: 1.3,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    if (onVerPressed != null) ...[
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: onVerPressed,
+                        child: const Text(
+                          'Ver conversa →',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFDC143C),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            // botão fechar
+            Padding(
+              padding: const EdgeInsets.only(top: 8, right: 8),
+              child: GestureDetector(
+                onTap: onDismiss,
+                child: const Icon(
+                  Icons.close,
+                  size: 32,
+                  color: Color(0xFFAAAAAA),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

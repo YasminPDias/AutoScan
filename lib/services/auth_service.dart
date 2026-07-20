@@ -558,13 +558,32 @@ class AuthService {
     }
   }
 
-  /// Ponto único de logout — desregistra o push, desconecta o socket, limpa
-  /// a sessão salva, e navega pro login. Chama isso em vez de duplicar essas
-  /// quatro etapas em cada tela que tem um botão de sair.
+  /// Ponto único de logout — invalida a sessão no backend, desregistra o
+  /// push, desconecta o socket, limpa a sessão salva, e navega pro login.
   static Future<void> logout(BuildContext context) async {
-    await pushService.desregistrar(); // precisa do token ainda válido, por isso vem antes do clear
+    final token = await AuthStorage.getToken();
+
+    // invalida a sessão no Redis do backend — qualquer outro dispositivo
+    // com o mesmo token recebe 401 na próxima requisição e é deslogado
+    // automaticamente pelo ApiClient
+    if (token != null) {
+      try {
+        await http.post(
+          Uri.parse('${ApiConfig.baseUrl}/auth/logout'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        );
+      } catch (_) {
+        // falha de rede não impede o logout local
+      }
+    }
+
+    await pushService.desregistrar(); // precisa do token ainda válido
     socketService.desconectar();
     await AuthStorage.clear();
+
     if (context.mounted) {
       Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
     }

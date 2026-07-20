@@ -22,6 +22,20 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _errorMessage;
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // exibe mensagem de sessão encerrada quando redirecionado pelo ApiClient
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Map && args['mensagemErro'] != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _errorMessage = args['mensagemErro'].toString());
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _senhaController.dispose();
