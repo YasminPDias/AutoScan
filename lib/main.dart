@@ -9,6 +9,8 @@ import 'screens/register/register_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/profile/profile_screen.dart';
+import 'screens/profile/edit_profile_screen.dart';
+import 'screens/profile/change_password_screen.dart';
 import 'screens/history/history_screen.dart';
 import 'screens/diagnostic/diagnostic_screen.dart';
 import 'screens/diagnostic/diagnostic_result_screen.dart';
@@ -75,12 +77,14 @@ class AutexApp extends StatelessWidget {
         '/home': (context) => const HomeScreen(),
         '/dashboard': (context) => const DashboardScreen(),
         '/profile': (context) => const ProfileScreen(),
+        '/edit-profile': (context) => const EditProfileScreen(),
         '/history': (context) => const HistoryScreen(),
         '/diagnostic': (context) => const DiagnosticScreen(),
         '/diagnostic-result': (context) => const DiagnosticResultScreen(),
         '/plans': (context) => const PlansScreen(),
         '/chat': (context) => const ChatScreen(),
         '/chat-history': (context) => const ChatHistoryScreen(),
+        '/change-password': (context) => const ChangePasswordScreen(),
       },
     );
   }

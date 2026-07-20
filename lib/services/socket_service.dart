@@ -30,7 +30,7 @@ class SocketService {
     if (_socket != null && _socket!.connected) return; // já conectado
 
     _socket = IO.io(
-      ApiConfig.baseUrl,
+      ApiConfig.wsUrl,
       IO.OptionBuilder()
           .setTransports(['websocket'])
           .setPath('/chatws')

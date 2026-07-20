@@ -17,6 +17,7 @@ import '../../services/logger_service.dart';
 import '../../services/websocket_service.dart';
 import '../../services/web_audio_recorder.dart';
 import '../../services/chat_read_tracker.dart';
+import '../../services/api_config.dart';
 import '../../models/mensagem_model.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -151,9 +152,7 @@ class _ChatScreenState extends State<ChatScreen> {
         return [];
       },
       onUpdate: (rawList) {
-        final novas = rawList
-            .map((j) => MensagemModel.fromJson(j))
-            .toList()
+        final novas = rawList.map((j) => MensagemModel.fromJson(j)).toList()
           ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
         if (mounted && _mensagensAlteradas(novas)) {
@@ -167,13 +166,18 @@ class _ChatScreenState extends State<ChatScreen> {
             final msg = MensagemModel.fromJson(json);
             if (mounted && !_mensagens.any((m) => m.id == msg.id)) {
               final senderId = msg.usuario?.id ?? json['usuarioId']?.toString();
-              final isMeu = senderId != null && _myUserId != null && senderId == _myUserId;
+              final isMeu =
+                  senderId != null &&
+                  _myUserId != null &&
+                  senderId == _myUserId;
 
               if (isMeu) {
-                final idxPendente = _mensagens.indexWhere((m) =>
-                    m.isPending &&
-                    m.tipo == msg.tipo &&
-                    (m.tipo != 'TEXTO' || m.conteudo == msg.conteudo));
+                final idxPendente = _mensagens.indexWhere(
+                  (m) =>
+                      m.isPending &&
+                      m.tipo == msg.tipo &&
+                      (m.tipo != 'TEXTO' || m.conteudo == msg.conteudo),
+                );
 
                 if (idxPendente != -1) {
                   setState(() => _mensagens[idxPendente] = msg);
@@ -225,8 +229,8 @@ class _ChatScreenState extends State<ChatScreen> {
       return null;
     }
 
-    final convId =
-        (createResult['data'] as Map<String, dynamic>)['id']?.toString();
+    final convId = (createResult['data'] as Map<String, dynamic>)['id']
+        ?.toString();
 
     if (convId != null &&
         diagnosticoTexto != null &&
@@ -253,10 +257,11 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!mounted) return;
 
     if (result['success'] == true) {
-      final lista = (result['data'] as List)
-          .map((j) => MensagemModel.fromJson(j as Map<String, dynamic>))
-          .toList()
-        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      final lista =
+          (result['data'] as List)
+              .map((j) => MensagemModel.fromJson(j as Map<String, dynamic>))
+              .toList()
+            ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
       setState(() {
         _mensagens = lista;
@@ -478,8 +483,8 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    final midiaUrl =
-        (uploadResult['data'] as Map<String, dynamic>)['url']?.toString();
+    final midiaUrl = (uploadResult['data'] as Map<String, dynamic>)['url']
+        ?.toString();
 
     if (midiaUrl == null || midiaUrl.isEmpty) {
       setState(() {
@@ -599,7 +604,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (mounted) setState(() => _isRecordingAudio = false);
 
-    if (path == null && webBytes == null || _conversaId == null || _token == null) return;
+    if (path == null && webBytes == null ||
+        _conversaId == null ||
+        _token == null)
+      return;
 
     Uint8List bytes;
     if (kIsWeb) {
@@ -656,8 +664,8 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    final midiaUrl =
-        (uploadResult['data'] as Map<String, dynamic>)['url']?.toString();
+    final midiaUrl = (uploadResult['data'] as Map<String, dynamic>)['url']
+        ?.toString();
 
     if (midiaUrl == null || midiaUrl.isEmpty) {
       setState(() {
@@ -764,16 +772,16 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: CircularProgressIndicator(color: AppColors.primaryRed),
               )
             : _errorMessage != null
-                ? _buildErro()
-                : Column(
-                    children: [
-                      Expanded(child: _buildListaMensagens()),
-                      if (_isEncerrada)
-                        _buildBannerEncerrada()
-                      else
-                        _buildBarraInput(),
-                    ],
-                  ),
+            ? _buildErro()
+            : Column(
+                children: [
+                  Expanded(child: _buildListaMensagens()),
+                  if (_isEncerrada)
+                    _buildBannerEncerrada()
+                  else
+                    _buildBarraInput(),
+                ],
+              ),
       ),
     );
   }
@@ -849,15 +857,15 @@ class _ChatScreenState extends State<ChatScreen> {
     } else if (msg.tipo == 'AUDIO' && !msg.isPending && msg.midiaUrl != null) {
       bubblePadding = const EdgeInsets.symmetric(horizontal: 8, vertical: 10);
     } else {
-      bubblePadding =
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 10);
+      bubblePadding = const EdgeInsets.symmetric(horizontal: 14, vertical: 10);
     }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
-        mainAxisAlignment:
-            isMeu ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isMeu
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isMeu) ...[
@@ -879,8 +887,9 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
           Flexible(
             child: Column(
-              crossAxisAlignment:
-                  isMeu ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              crossAxisAlignment: isMeu
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
               children: [
                 if (!isMeu && msg.usuario != null)
                   Padding(
@@ -911,9 +920,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: Container(
                     padding: bubblePadding,
                     decoration: BoxDecoration(
-                      color: isMeu
-                          ? AppColors.lightRed
-                          : AppColors.cardWhite,
+                      color: isMeu ? AppColors.lightRed : AppColors.cardWhite,
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(12),
                         topRight: const Radius.circular(12),
@@ -1006,7 +1013,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final rawUrl = msg.midiaUrl!;
       final imageUrl = rawUrl.startsWith('http')
           ? rawUrl
-          : 'https://apiautoscan.duckdns.org$rawUrl';
+          : '${ApiConfig.baseUrl}$rawUrl';
       loggerService.d('chat image URL: $imageUrl');
       return GestureDetector(
         onTap: () => _abrirImagemFullscreen(imageUrl),
@@ -1018,44 +1025,47 @@ class _ChatScreenState extends State<ChatScreen> {
             bottomRight: Radius.circular(isMeu ? 0 : 10),
           ),
           child: Image.network(
-          imageUrl,
-          width: 220,
-          fit: BoxFit.cover,
-          loadingBuilder: (ctx, child, progress) {
-            if (progress == null) return child;
-            return const SizedBox(
-              width: 220,
-              height: 160,
-              child: Center(
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.primaryRed,
+            imageUrl,
+            width: 220,
+            fit: BoxFit.cover,
+            loadingBuilder: (ctx, child, progress) {
+              if (progress == null) return child;
+              return const SizedBox(
+                width: 220,
+                height: 160,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primaryRed,
+                  ),
                 ),
-              ),
-            );
-          },
-          errorBuilder: (ctx, err, stack) {
-            loggerService.e('Falha ao carregar imagem: $imageUrl — $err');
-            return Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(
-                    Icons.broken_image_outlined,
-                    size: 36,
-                    color: AppColors.textLight,
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Imagem indisponível',
-                    style: TextStyle(fontSize: 11, color: AppColors.textLight),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
+              );
+            },
+            errorBuilder: (ctx, err, stack) {
+              loggerService.e('Falha ao carregar imagem: $imageUrl — $err');
+              return Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(
+                      Icons.broken_image_outlined,
+                      size: 36,
+                      color: AppColors.textLight,
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Imagem indisponível',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textLight,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       );
     }
@@ -1200,8 +1210,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           decoration: BoxDecoration(
                             color: const Color(0xFFE8F5E9),
                             shape: BoxShape.circle,
-                            border:
-                                Border.all(color: const Color(0xFF388E3C)),
+                            border: Border.all(color: const Color(0xFF388E3C)),
                           ),
                           child: IconButton(
                             icon: const Icon(
@@ -1359,9 +1368,16 @@ class _ImageViewerPage extends StatelessWidget {
             errorBuilder: (ctx, err, stack) => const Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48),
+                Icon(
+                  Icons.broken_image_outlined,
+                  color: Colors.white54,
+                  size: 48,
+                ),
                 SizedBox(height: 8),
-                Text('Imagem indisponível', style: TextStyle(color: Colors.white54)),
+                Text(
+                  'Imagem indisponível',
+                  style: TextStyle(color: Colors.white54),
+                ),
               ],
             ),
           ),
@@ -1419,7 +1435,7 @@ class _AudioBubbleState extends State<_AudioBubble> {
       final rawUrl = widget.url;
       final audioUrl = rawUrl.startsWith('http')
           ? rawUrl
-          : 'https://apiautoscan.duckdns.org$rawUrl';
+          : '${ApiConfig.baseUrl}$rawUrl';
       await _player.play(UrlSource(audioUrl));
     }
   }
@@ -1460,10 +1476,12 @@ class _AudioBubbleState extends State<_AudioBubble> {
                 SliderTheme(
                   data: SliderThemeData(
                     trackHeight: 2,
-                    thumbShape:
-                        const RoundSliderThumbShape(enabledThumbRadius: 5),
-                    overlayShape:
-                        const RoundSliderOverlayShape(overlayRadius: 8),
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 5,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 8,
+                    ),
                     activeTrackColor: active,
                     inactiveTrackColor: active.withValues(alpha: 0.25),
                     thumbColor: active,
