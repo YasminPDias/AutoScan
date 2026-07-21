@@ -42,6 +42,7 @@ class SocketService {
           .setTransports(['websocket'])
           .setPath('/chatws')
           .setAuth({'token': token})
+          .enableForceNew()
           .build(),
     );
 

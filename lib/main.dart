@@ -17,6 +17,8 @@ import 'screens/diagnostic/diagnostic_result_screen.dart';
 import 'screens/plans/plans_screen.dart';
 import 'screens/chat/chat_screen.dart';
 import 'screens/chat/chat_history_screen.dart';
+import 'screens/empresa/criar_empresa_screen.dart';
+import 'screens/empresa/empresa_funcionario_screen.dart';
 import 'screens/admin/users_screen.dart';
 import 'services/auth_storage.dart';
 import 'services/logger_service.dart';
@@ -85,6 +87,8 @@ class AutexApp extends StatelessWidget {
         '/chat': (context) => const ChatScreen(),
         '/chat-history': (context) => const ChatHistoryScreen(),
         '/change-password': (context) => const ChangePasswordScreen(),
+        '/empresa/criar': (context) => const CriarEmpresaScreen(),
+        '/empresa/funcionarios': (context) => const EmpresaFuncionariosScreen(),
         '/admin/users': (context) => const UsersScreen(),
       },
     );

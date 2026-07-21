@@ -22,6 +22,7 @@ class _AppSidebarState extends State<AppSidebar> {
   String _userName = '';
   String _userEmail = '';
   String _userRole = '';
+  bool _isEmpresaAdmin = false;
   Uint8List? _profilePhotoBytes;
   String? _profilePhotoUrl;
   bool _photoLoadFailed = false;
@@ -145,6 +146,7 @@ class _AppSidebarState extends State<AppSidebar> {
     final email = await AuthStorage.getUserEmail();
     final photo = await AuthStorage.getUserProfilePhoto();
     final role = await AuthStorage.getUserRole();
+    final isEmpAdmin = await AuthStorage.isEmpresaAdmin();
 
     Uint8List? photoBytes;
     String? photoUrl;
@@ -159,6 +161,7 @@ class _AppSidebarState extends State<AppSidebar> {
         _userName = name ?? 'Usuário';
         _userEmail = email ?? '';
         _userRole = role ?? '';
+        _isEmpresaAdmin = isEmpAdmin;
         _profilePhotoBytes = photoBytes;
         _profilePhotoUrl = photoUrl;
         _photoLoadFailed = false;
@@ -232,6 +235,22 @@ class _AppSidebarState extends State<AppSidebar> {
                       route: '/chat-history',
                       badge: ChatReadTracker.totalUnread,
                     ),
+                  ),
+                if (_isEmpresaAdmin)
+                  _buildNavItem(
+                    context,
+                    icon: Icons.business_outlined,
+                    activeIcon: Icons.business,
+                    label: 'Empresa',
+                    route: '/empresa/funcionarios',
+                  ),
+                if (_userRole.toUpperCase() == 'ADMIN')
+                  _buildNavItem(
+                    context,
+                    icon: Icons.manage_accounts_outlined,
+                    activeIcon: Icons.manage_accounts,
+                    label: 'Gestão de Usuários',
+                    route: '/admin/users',
                   ),
                 _buildNavItem(
                   context,
