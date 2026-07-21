@@ -240,6 +240,15 @@ class _AppDrawerState extends State<AppDrawer> {
                       Navigator.pushReplacementNamed(context, '/chat-history');
                     },
                   ),
+                if (_userRole.toUpperCase() == 'ADMIN')
+                  ListTile(
+                    leading: const Icon(Icons.manage_accounts),
+                    title: const Text('Gestão de Usuários'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushReplacementNamed(context, '/admin/users');
+                    },
+                  ),
                 const Divider(),
                 ListTile(
                   leading: const Icon(Icons.exit_to_app),

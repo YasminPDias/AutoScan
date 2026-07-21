@@ -4,6 +4,8 @@ import '../../layouts/desktop_layout.dart';
 import '../../utils/responsive.dart';
 import '../../widgets_defaults/feature_card.dart';
 import '../../services/auth_storage.dart';
+import '../../services/diagnostic_service.dart';
+import '../../services/logger_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,11 +16,15 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _userName = '';
+  List<dynamic> _chamadosAbertos = [];
+  bool _isLoadingChamados = true;
+  String? _token;
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _carregarChamadosAbertos();
   }
 
   Future<void> _loadUserData() async {
@@ -29,12 +35,294 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<void> _carregarChamadosAbertos() async {
+    setState(() => _isLoadingChamados = true);
+    _token = await AuthStorage.getToken();
+
+    if (_token == null || _token!.isEmpty) {
+      if (mounted) setState(() => _isLoadingChamados = false);
+      return;
+    }
+
+    try {
+      final res = await DiagnosticService.buscarMeusDiagnosticosAbertos(token: _token!);
+      if (!mounted) return;
+
+      if (res['success'] == true) {
+        setState(() {
+          _chamadosAbertos = (res['data'] as List).cast<dynamic>();
+          _isLoadingChamados = false;
+        });
+      } else {
+        setState(() => _isLoadingChamados = false);
+      }
+    } catch (e) {
+      loggerService.e('Erro ao carregar chamados em aberto na Home: $e');
+      if (mounted) setState(() => _isLoadingChamados = false);
+    }
+  }
+
   String get _welcomeTitle {
     if (_userName.isEmpty) return 'Bem-vindo ao Autex';
     final firstName = _userName.split(' ').first.trim();
-    return firstName.isEmpty
-        ? 'Bem-vindo ao Autex'
-        : 'Bem-vindo, $firstName';
+    return firstName.isEmpty ? 'Bem-vindo ao Autex' : 'Bem-vindo, $firstName';
+  }
+
+  void _abrirChatDoChamado(Map<String, dynamic> item) {
+    final diagnosticoId = item['id']?.toString();
+    final conversa = item['conversa'] as Map<String, dynamic>?;
+    final conversaId = conversa?['id']?.toString();
+
+    if (conversaId != null && conversaId.isNotEmpty) {
+      Navigator.pushNamed(context, '/chat', arguments: {'conversaId': conversaId});
+    } else if (diagnosticoId != null && diagnosticoId.isNotEmpty) {
+      final diagnosticoTexto = item['diagnostico']?.toString();
+      Navigator.pushNamed(
+        context,
+        '/chat',
+        arguments: {
+          'diagnosticoId': diagnosticoId,
+          'diagnosticoTexto': diagnosticoTexto,
+        },
+      );
+    }
+  }
+
+  Widget _buildStatusBadge(String status) {
+    Color bg = const Color(0xFFFFF3E0);
+    Color fg = const Color(0xFFE65100);
+    String label = 'PENDENTE';
+
+    switch (status.toUpperCase()) {
+      case 'EM_ANALISE':
+        bg = const Color(0xFFE3F2FD);
+        fg = const Color(0xFF1565C0);
+        label = 'EM ANÁLISE';
+        break;
+      case 'PENDENTE':
+        bg = const Color(0xFFFFF8E1);
+        fg = const Color(0xFFF57F17);
+        label = 'PENDENTE';
+        break;
+      case 'CONCLUIDO':
+        bg = const Color(0xE8E8F5E9);
+        fg = const Color(0xFF2E7D32);
+        label = 'CONCLUÍDO';
+        break;
+      default:
+        label = status;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: fg,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChamadosAbertosSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryRed,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Chamados & Conversas em Aberto',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh, size: 20),
+              onPressed: _carregarChamadosAbertos,
+              tooltip: 'Atualizar chamados',
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (_isLoadingChamados)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(color: AppColors.primaryRed),
+            ),
+          )
+        else if (_chamadosAbertos.isEmpty)
+          Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: AppColors.border),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.lightRed,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.check_circle_outline,
+                      color: AppColors.primaryRed,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Nenhum chamado em aberto no momento',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Precisa de ajuda com o seu veículo? Inicie um novo diagnóstico inteligente.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pushNamed(context, '/diagnostic'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryRed,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    child: const Text('Novo Diagnóstico', style: TextStyle(color: Colors.white)),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _chamadosAbertos.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final item = _chamadosAbertos[index] as Map<String, dynamic>;
+              final status = item['status']?.toString() ?? 'PENDENTE';
+              final dados = item['dadosParaDiagnostico'] as Map<String, dynamic>? ?? {};
+              final veiculo = '${dados['marcaVeiculo'] ?? ''} ${dados['modeloVeiculo'] ?? ''}'.trim();
+              final ano = dados['anoVeiculo']?.toString() ?? '';
+              final sintomas = dados['sintomas']?.toString() ?? 'Sem descrição de sintomas';
+              final codObd = dados['codigoODB2']?.toString() ?? '';
+
+              return Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: const BorderSide(color: AppColors.border),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1976D2).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.chat_bubble_outline,
+                          color: Color(0xFF1976D2),
+                          size: 26,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  veiculo.isNotEmpty ? '$veiculo ($ano)' : 'Veículo não informado',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                _buildStatusBadge(status),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              codObd.isNotEmpty ? 'Código OBD: $codObd | Sintomas: $sintomas' : 'Sintomas: $sintomas',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        onPressed: () => _abrirChatDoChamado(item),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1976D2),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.forum, size: 18, color: Colors.white),
+                        label: const Text('Abrir Chat', style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+      ],
+    );
   }
 
   @override
@@ -47,9 +335,7 @@ class _HomeScreenState extends State<HomeScreen> {
         color: AppColors.background,
         child: SingleChildScrollView(
           padding: EdgeInsets.all(context.isDesktop ? 32 : 20),
-          child: context.isDesktop
-              ? _buildDesktopLayout(context)
-              : _buildMobileLayout(context),
+          child: context.isDesktop ? _buildDesktopLayout(context) : _buildMobileLayout(context),
         ),
       ),
     );
@@ -71,7 +357,7 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primaryRed.withValues(alpha: 0.3),
+                color: AppColors.primaryRed.withOpacity(0.3),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
@@ -83,15 +369,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: 140,
                 height: 140,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.3),
+                    color: Colors.white.withOpacity(0.3),
                     width: 2,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
+                      color: Colors.black.withOpacity(0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -110,7 +396,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Text(
                       _welcomeTitle,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 36,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -122,7 +408,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       'Sistema Profissional de Diagnóstico Automotivo',
                       style: TextStyle(
                         fontSize: 18,
-                        color: Colors.white.withValues(alpha: 0.95),
+                        color: Colors.white.withOpacity(0.95),
                         fontWeight: FontWeight.w400,
                       ),
                     ),
@@ -142,6 +428,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
+        const SizedBox(height: 32),
+        _buildChamadosAbertosSection(context),
         const SizedBox(height: 40),
         Row(
           children: [
@@ -175,7 +463,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             _buildEnhancedFeatureCard(
               icon: Icons.analytics_outlined,
-              title: 'Diagnósticos Inteligente',
+              title: 'Diagnóstico Inteligente',
               description: 'Análise completa e precisa do seu veículo',
               color: AppColors.primaryRed,
               onTap: () => Navigator.pushNamed(context, '/diagnostic'),
@@ -238,10 +526,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.3),
+                  color: Colors.white.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: Colors.white.withOpacity(0.5),
                     width: 2,
                   ),
                 ),
@@ -255,7 +543,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(
                 _welcomeTitle,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -271,6 +559,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 24),
+        _buildChamadosAbertosSection(context),
+        const SizedBox(height: 24),
         const Text(
           'Recursos Principais',
           style: TextStyle(
@@ -282,25 +572,22 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 16),
         FeatureCard(
           icon: Icons.analytics_outlined,
-          title: 'Diagnósticos Inteligente',
-          description:
-              'Análise completa e precisa do seu veículo com tecnologia avançada',
+          title: 'Diagnóstico Inteligente',
+          description: 'Análise completa e precisa do seu veículo com tecnologia avançada',
           onTap: () => Navigator.pushNamed(context, '/diagnostic'),
         ),
         const SizedBox(height: 20),
         FeatureCard(
           icon: Icons.chat_bubble_outline,
           title: 'Chat com Especialista',
-          description:
-              'Tire suas dúvidas com IA ou abra um chamado e aguarde um mecânico especializado',
+          description: 'Tire suas dúvidas com IA ou abra um chamado e aguarde um mecânico especializado',
           onTap: () => Navigator.pushNamed(context, '/history'),
         ),
         const SizedBox(height: 20),
         FeatureCard(
           icon: Icons.description_outlined,
           title: 'Planos e Assinaturas',
-          description:
-              'Conheça nossos planos e fique por dentro de todas as funcionalidades',
+          description: 'Conheça nossos planos e fique por dentro de todas as funcionalidades',
           onTap: () => Navigator.pushNamed(context, '/plans'),
         ),
       ],
@@ -311,9 +598,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
+        color: Colors.white.withOpacity(0.2),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+        border: Border.all(color: Colors.white.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -330,7 +617,7 @@ class _HomeScreenState extends State<HomeScreen> {
             label,
             style: TextStyle(
               fontSize: 11,
-              color: Colors.white.withValues(alpha: 0.9),
+              color: Colors.white.withOpacity(0.9),
             ),
           ),
         ],
@@ -352,7 +639,7 @@ class _HomeScreenState extends State<HomeScreen> {
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -373,7 +660,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
+                    color: color.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(icon, size: 24, color: color),

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'api_config.dart';
 import 'auth_storage.dart';
 import 'logger_service.dart';
 import 'push_service.dart';
@@ -112,16 +113,7 @@ class ApiClient {
   }
 
   static String _baseUrl() {
-    // leitura em tempo de execução pra respeitar a lógica por plataforma
-    // que já existe em ApiConfig (web/android/iOS têm URLs diferentes)
-    try {
-      // ignore: avoid_dynamic_calls
-      return (Uri.base.scheme == 'http' || Uri.base.scheme == 'https')
-          ? 'http://localhost:3000' // web
-          : 'http://10.0.2.2:3000'; // android emulator
-    } catch (_) {
-      return 'http://localhost:3000';
-    }
+    return ApiConfig.baseUrl;
   }
 
   static Map<String, String> _headers(
