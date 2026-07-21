@@ -153,7 +153,7 @@ class _ChatScreenState extends State<ChatScreen> {
         final novas = rawList
             .map((j) => MensagemModel.fromJson(j))
             .toList()
-          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
         if (mounted && _mensagensAlteradas(novas)) {
           setState(() => _mensagens = novas);
@@ -180,8 +180,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 }
               }
 
-              setState(() => _mensagens.add(msg));
-            
+              setState(() => _mensagens.insert(0, msg));
             }
           } catch (_) {}
         }
@@ -269,7 +268,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final lista = (result['data'] as List)
           .map((j) => MensagemModel.fromJson(j as Map<String, dynamic>))
           .toList()
-        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       setState(() {
         _mensagens = lista;

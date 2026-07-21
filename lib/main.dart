@@ -17,10 +17,12 @@ import 'screens/diagnostic/diagnostic_result_screen.dart';
 import 'screens/plans/plans_screen.dart';
 import 'screens/chat/chat_screen.dart';
 import 'screens/chat/chat_history_screen.dart';
+import 'screens/admin/users_screen.dart';
 import 'services/auth_storage.dart';
 import 'services/logger_service.dart';
 import 'services/socket_service.dart';
 import 'services/push_service.dart';
+import 'services/chat_read_tracker.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,13 +35,11 @@ void main() async {
   final loggedIn = await AuthStorage.isLoggedIn();
 
   if (loggedIn) {
-    // app reaberto com sessão já ativa (não passou pela tela de login agora) —
-    // conecta direto, sem esperar a ação de login.
-    // TODO: ajusta 'getToken' pro método real de pegar o token no AuthStorage
     final token = await AuthStorage.getToken();
     if (token != null) {
       socketService.conectar(token);
       await pushService.inicializar();
+      await ChatReadTracker.carregarDaApi(token);
     }
   }
 
@@ -85,6 +85,7 @@ class AutexApp extends StatelessWidget {
         '/chat': (context) => const ChatScreen(),
         '/chat-history': (context) => const ChatHistoryScreen(),
         '/change-password': (context) => const ChangePasswordScreen(),
+        '/admin/users': (context) => const UsersScreen(),
       },
     );
   }

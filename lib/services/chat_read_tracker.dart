@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
+import 'chat_service.dart';
 
 /// Rastreador de mensagens não lidas por conversa.
 ///
 /// Cache em memória da contagem real que vem do backend
 /// (GET /conversas/nao-lidas), atualizada:
+///   - ao realizar login ou iniciar o app (ChatReadTracker.carregarDaApi)
 ///   - ao abrir a lista (ChatHistoryScreen._carregarConversas)
 ///   - em tempo real via evento conversaAtualizada/novoChamado (socket)
 ///   - ao abrir uma conversa (zera localmente)
@@ -23,13 +25,31 @@ class ChatReadTracker {
     notifier.value = totalUnread;
   }
 
+  /// Busca as mensagens/conversas não lidas da API (GET /conversas/nao-lidas)
+  /// e atualiza o badge automaticamente.
+  static Future<void> carregarDaApi(String token) async {
+    try {
+      final res = await ChatService.buscarNaoLidas(token: token);
+      if (res['success'] == true && res['data'] is List) {
+        final list = (res['data'] as List)
+            .map((e) => e is Map<String, dynamic> ? e : Map<String, dynamic>.from(e as Map))
+            .toList();
+        popularDoBackend(list);
+      }
+    } catch (_) {}
+  }
+
   /// Substitui o mapa inteiro com os dados vindos do backend.
   /// Chama isso logo após carregar a lista de conversas.
   static void popularDoBackend(List<Map<String, dynamic>> dados) {
     _naoLidas.clear();
     for (final item in dados) {
-      final id = item['conversaId']?.toString();
-      final count = int.tryParse(item['naoLidas']?.toString() ?? '0') ?? 0;
+      final id = (item['conversaId'] ?? item['id'] ?? item['_id'])?.toString();
+      final count = int.tryParse(
+            (item['naoLidas'] ?? item['count'] ?? item['total'] ?? item['unread'] ?? '0')
+                .toString(),
+          ) ??
+          0;
       if (id != null && count > 0) {
         _naoLidas[id] = count;
       }
