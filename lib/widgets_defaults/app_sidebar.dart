@@ -6,6 +6,7 @@ import '../services/auth_storage.dart';
 import '../services/auth_service.dart';
 import '../services/api_config.dart';
 import '../services/chat_read_tracker.dart';
+import '../services/socket_service.dart';
 import 'network_avatar_image.dart';
 
 class AppSidebar extends StatefulWidget {
@@ -21,6 +22,7 @@ class _AppSidebarState extends State<AppSidebar> {
   String _userName = '';
   String _userEmail = '';
   String _userRole = '';
+  bool _isEmpresaAdmin = false;
   Uint8List? _profilePhotoBytes;
   String? _profilePhotoUrl;
   bool _photoLoadFailed = false;
@@ -118,6 +120,25 @@ class _AppSidebarState extends State<AppSidebar> {
   void initState() {
     super.initState();
     _loadUserData();
+
+    // quando chega um novo chamado via socket, incrementa o badge —
+    // o ValueListenableBuilder no build reconstrói automaticamente
+    socketService.onNovoChamado = (data) {
+      final conversaId = data['conversaId']?.toString();
+      if (conversaId != null) ChatReadTracker.incrementar(conversaId);
+    };
+    socketService.onChamadoDisponivel = (data) {
+      final conversaId = data['conversaId']?.toString();
+      if (conversaId != null) ChatReadTracker.incrementar(conversaId);
+    };
+  }
+
+  @override
+  void dispose() {
+    // limpa os callbacks pra não vazar depois que a sidebar for desmontada
+    if (socketService.onNovoChamado != null) socketService.onNovoChamado = null;
+    if (socketService.onChamadoDisponivel != null) socketService.onChamadoDisponivel = null;
+    super.dispose();
   }
 
   Future<void> _loadUserData() async {
@@ -125,6 +146,7 @@ class _AppSidebarState extends State<AppSidebar> {
     final email = await AuthStorage.getUserEmail();
     final photo = await AuthStorage.getUserProfilePhoto();
     final role = await AuthStorage.getUserRole();
+    final isEmpAdmin = await AuthStorage.isEmpresaAdmin();
 
     Uint8List? photoBytes;
     String? photoUrl;
@@ -139,6 +161,7 @@ class _AppSidebarState extends State<AppSidebar> {
         _userName = name ?? 'Usuário';
         _userEmail = email ?? '';
         _userRole = role ?? '';
+        _isEmpresaAdmin = isEmpAdmin;
         _profilePhotoBytes = photoBytes;
         _profilePhotoUrl = photoUrl;
         _photoLoadFailed = false;
@@ -202,13 +225,32 @@ class _AppSidebarState extends State<AppSidebar> {
                     route: '/chat',
                   ),
                 if (_isAdminOrAssistente)
+                  ValueListenableBuilder<int>(
+                    valueListenable: ChatReadTracker.notifier,
+                    builder: (context, _, __) => _buildNavItem(
+                      context,
+                      icon: Icons.support_agent_outlined,
+                      activeIcon: Icons.support_agent,
+                      label: 'Atendimentos',
+                      route: '/chat-history',
+                      badge: ChatReadTracker.totalUnread,
+                    ),
+                  ),
+                if (_isEmpresaAdmin)
                   _buildNavItem(
                     context,
-                    icon: Icons.support_agent_outlined,
-                    activeIcon: Icons.support_agent,
-                    label: 'Atendimentos',
-                    route: '/chat-history',
-                    badge: ChatReadTracker.totalUnread,
+                    icon: Icons.business_outlined,
+                    activeIcon: Icons.business,
+                    label: 'Empresa',
+                    route: '/empresa/funcionarios',
+                  ),
+                if (_userRole.toUpperCase() == 'ADMIN')
+                  _buildNavItem(
+                    context,
+                    icon: Icons.manage_accounts_outlined,
+                    activeIcon: Icons.manage_accounts,
+                    label: 'Gestão de Usuários',
+                    route: '/admin/users',
                   ),
                 _buildNavItem(
                   context,

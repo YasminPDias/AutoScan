@@ -17,6 +17,7 @@ import '../../services/logger_service.dart';
 import '../../services/websocket_service.dart';
 import '../../services/web_audio_recorder.dart';
 import '../../services/chat_read_tracker.dart';
+import '../../services/api_config.dart';
 import '../../models/mensagem_model.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -29,7 +30,6 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final FocusNode _focusNode = FocusNode();
   final ChatRealtimeService _realtimeService = ChatRealtimeService();
   final AudioRecorder _audioRecorder = AudioRecorder();
   final WebAudioRecorder _webAudioRecorder = WebAudioRecorder();
@@ -120,7 +120,6 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       return;
     }
-
     _conversaId = conversaId;
     ChatReadTracker.markRead(conversaId);
 
@@ -154,11 +153,10 @@ class _ChatScreenState extends State<ChatScreen> {
         final novas = rawList
             .map((j) => MensagemModel.fromJson(j))
             .toList()
-          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
         if (mounted && _mensagensAlteradas(novas)) {
           setState(() => _mensagens = novas);
-          _scrollToBottom();
         }
       },
       onWsMessage: (json) {
@@ -177,16 +175,30 @@ class _ChatScreenState extends State<ChatScreen> {
 
                 if (idxPendente != -1) {
                   setState(() => _mensagens[idxPendente] = msg);
-                  _scrollToBottom();
+                  
                   return;
                 }
               }
 
-              setState(() => _mensagens.add(msg));
-              _scrollToBottom();
+              setState(() => _mensagens.insert(0, msg));
             }
           } catch (_) {}
         }
+      },
+      onMensagensLidas: (leitorId) {
+        // é o OUTRO participante lendo — marca minhas mensagens enviadas
+        // como lidas (é o mesmo efeito do check azul do WhatsApp)
+        if (leitorId == _myUserId || !mounted) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          setState(() {
+            _mensagens = _mensagens
+                .map((m) => _isMinhaMensagem(m) && m.readAt == null
+                    ? m.copyWith(readAt: DateTime.now())
+                    : m)
+                .toList();
+          });
+        });
       },
     );
   }
@@ -195,7 +207,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final confirmadas = _mensagens.where((m) => !m.isPending).toList();
     if (novas.length != confirmadas.length) return true;
     if (novas.isEmpty) return false;
-    return novas.last.id != confirmadas.lastOrNull?.id;
+    return novas.first.id != confirmadas.firstOrNull?.id;
   }
 
   Future<String?> _encontrarOuCriarConversa({
@@ -203,15 +215,15 @@ class _ChatScreenState extends State<ChatScreen> {
     required String diagnosticoId,
     String? diagnosticoTexto,
   }) async {
-    final minhasResult = await ChatService.buscarMinhasConversas(token: token);
+    final minhasResult = await ChatService.buscarConversaPorDiagnosticoId(
+      token: token,
+      diagnosticoId: diagnosticoId,
+    );
     if (minhasResult['success'] == true) {
-      final lista = minhasResult['data'] as List;
-      for (final item in lista) {
-        final conv = item as Map<String, dynamic>;
-        if (conv['aiDiagnosticoId']?.toString() == diagnosticoId) {
-          loggerService.d('Conversa existente: ${conv['id']}');
-          return conv['id']?.toString();
-        }
+      final data = minhasResult['data'] as Map<String, dynamic>;
+      if (data['aiDiagnosticoId']?.toString() == diagnosticoId) {
+        loggerService.d('Conversa existente: ${data['id']}');
+        return data['id']?.toString();
       }
     }
 
@@ -225,8 +237,8 @@ class _ChatScreenState extends State<ChatScreen> {
       return null;
     }
 
-    final convId =
-        (createResult['data'] as Map<String, dynamic>)['id']?.toString();
+    final convId = (createResult['data'] as Map<String, dynamic>)['id']
+        ?.toString();
 
     if (convId != null &&
         diagnosticoTexto != null &&
@@ -256,13 +268,12 @@ class _ChatScreenState extends State<ChatScreen> {
       final lista = (result['data'] as List)
           .map((j) => MensagemModel.fromJson(j as Map<String, dynamic>))
           .toList()
-        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       setState(() {
         _mensagens = lista;
         _isLoading = false;
       });
-      _scrollToBottom();
     } else {
       setState(() {
         _isLoading = false;
@@ -287,12 +298,10 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     setState(() {
-      _mensagens.add(msgPendente);
+      _mensagens.insert(0, msgPendente);
       _isSending = true;
       _messageController.clear();
     });
-    _focusNode.requestFocus();
-    _scrollToBottom();
 
     final result = await ChatService.enviarMensagem(
       token: _token!,
@@ -313,7 +322,7 @@ class _ChatScreenState extends State<ChatScreen> {
         // voltar (o backend emite pro socket antes de responder o POST) —
         // sem essa checagem, ela entraria duas vezes pra quem enviou
         if (!_mensagens.any((m) => m.id == msgConfirmada.id)) {
-          _mensagens.add(msgConfirmada);
+          _mensagens.insert(0, msgConfirmada);
         }
         _isSending = false;
       });
@@ -330,7 +339,6 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       );
     }
-    _scrollToBottom();
   }
 
   Future<void> _encerrarConversa() async {
@@ -373,7 +381,9 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _isEncerrandoConversa = false);
 
     if (result['success'] == true) {
-      setState(() => _conversaStatus = 'ENCERRADA');
+      setState(() {
+        _conversaStatus = 'ENCERRADA';
+      });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -383,18 +393,6 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       );
     }
-  }
-
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
   }
 
   Future<Uint8List> _comprimirImagem(Uint8List bytes) async {
@@ -445,10 +443,9 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     setState(() {
-      _mensagens.add(msgPendente);
+      _mensagens.insert(0, msgPendente);
       _isUploadingImage = true;
     });
-    _scrollToBottom();
 
     final bytes = await _comprimirImagem(file.bytes!);
     final fileName = file.name.toLowerCase().endsWith('.png')
@@ -478,8 +475,8 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    final midiaUrl =
-        (uploadResult['data'] as Map<String, dynamic>)['url']?.toString();
+    final midiaUrl = (uploadResult['data'] as Map<String, dynamic>)['url']
+        ?.toString();
 
     if (midiaUrl == null || midiaUrl.isEmpty) {
       setState(() {
@@ -506,7 +503,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _mensagens.removeWhere((m) => m.id == tempId);
         if (!_mensagens.any((m) => m.id == msgConfirmada.id)) {
-          _mensagens.add(msgConfirmada);
+          _mensagens.insert(0, msgConfirmada);
         }
         _isUploadingImage = false;
       });
@@ -523,7 +520,6 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       );
     }
-    _scrollToBottom();
   }
 
   // ── Áudio ──────────────────────────────────────────────────────────────────
@@ -599,7 +595,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (mounted) setState(() => _isRecordingAudio = false);
 
-    if (path == null && webBytes == null || _conversaId == null || _token == null) return;
+    if (path == null && webBytes == null ||
+        _conversaId == null ||
+        _token == null)
+      return;
 
     Uint8List bytes;
     if (kIsWeb) {
@@ -628,10 +627,9 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     setState(() {
-      _mensagens.add(msgPendente);
+      _mensagens.insert(0, msgPendente);
       _isUploadingAudio = true;
     });
-    _scrollToBottom();
 
     final uploadResult = await ChatService.uploadArquivo(
       token: _token!,
@@ -656,8 +654,8 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    final midiaUrl =
-        (uploadResult['data'] as Map<String, dynamic>)['url']?.toString();
+    final midiaUrl = (uploadResult['data'] as Map<String, dynamic>)['url']
+        ?.toString();
 
     if (midiaUrl == null || midiaUrl.isEmpty) {
       setState(() {
@@ -684,7 +682,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _mensagens.removeWhere((m) => m.id == tempId);
         if (!_mensagens.any((m) => m.id == msgConfirmada.id)) {
-          _mensagens.add(msgConfirmada);
+          _mensagens.insert(0, msgConfirmada);
         }
         _isUploadingAudio = false;
       });
@@ -701,7 +699,6 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       );
     }
-    _scrollToBottom();
   }
 
   Future<void> _cancelarGravacao() async {
@@ -764,16 +761,16 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: CircularProgressIndicator(color: AppColors.primaryRed),
               )
             : _errorMessage != null
-                ? _buildErro()
-                : Column(
-                    children: [
-                      Expanded(child: _buildListaMensagens()),
-                      if (_isEncerrada)
-                        _buildBannerEncerrada()
-                      else
-                        _buildBarraInput(),
-                    ],
-                  ),
+            ? _buildErro()
+            : Column(
+                children: [
+                  Expanded(child: _buildListaMensagens()),
+                  if (_isEncerrada)
+                    _buildBannerEncerrada()
+                  else
+                    _buildBarraInput(),
+                ],
+              ),
       ),
     );
   }
@@ -834,6 +831,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return ListView.builder(
       controller: _scrollController,
+      reverse: true,
       padding: EdgeInsets.all(context.isDesktop ? 40 : 20),
       itemCount: _mensagens.length,
       itemBuilder: (context, index) => _buildBolhaMensagem(_mensagens[index]),
@@ -849,15 +847,15 @@ class _ChatScreenState extends State<ChatScreen> {
     } else if (msg.tipo == 'AUDIO' && !msg.isPending && msg.midiaUrl != null) {
       bubblePadding = const EdgeInsets.symmetric(horizontal: 8, vertical: 10);
     } else {
-      bubblePadding =
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 10);
+      bubblePadding = const EdgeInsets.symmetric(horizontal: 14, vertical: 10);
     }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
-        mainAxisAlignment:
-            isMeu ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isMeu
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isMeu) ...[
@@ -879,8 +877,9 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
           Flexible(
             child: Column(
-              crossAxisAlignment:
-                  isMeu ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              crossAxisAlignment: isMeu
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
               children: [
                 if (!isMeu && msg.usuario != null)
                   Padding(
@@ -911,9 +910,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: Container(
                     padding: bubblePadding,
                     decoration: BoxDecoration(
-                      color: isMeu
-                          ? AppColors.lightRed
-                          : AppColors.cardWhite,
+                      color: isMeu ? AppColors.lightRed : AppColors.cardWhite,
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(12),
                         topRight: const Radius.circular(12),
@@ -947,6 +944,18 @@ class _ChatScreenState extends State<ChatScreen> {
                           Icons.access_time,
                           size: 10,
                           color: AppColors.textLight,
+                        ),
+                      ],
+                      if (isMeu && !msg.isPending) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          msg.readAt != null
+                              ? Icons.done_all
+                              : Icons.done,
+                          size: 13,
+                          color: msg.readAt != null
+                              ? Colors.blue
+                              : AppColors.textLight,
                         ),
                       ],
                     ],
@@ -1006,7 +1015,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final rawUrl = msg.midiaUrl!;
       final imageUrl = rawUrl.startsWith('http')
           ? rawUrl
-          : 'https://apiautoscan.duckdns.org$rawUrl';
+          : '${ApiConfig.baseUrl}$rawUrl';
       loggerService.d('chat image URL: $imageUrl');
       return GestureDetector(
         onTap: () => _abrirImagemFullscreen(imageUrl),
@@ -1117,7 +1126,6 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Botão de imagem
               _isUploadingImage
                   ? const Padding(
                       padding: EdgeInsets.all(10),
@@ -1136,7 +1144,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       color: AppColors.textSecondary,
                       tooltip: 'Enviar imagem',
                     ),
-              // Botão de microfone
               _isUploadingAudio
                   ? const Padding(
                       padding: EdgeInsets.all(10),
@@ -1156,7 +1163,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       tooltip: 'Gravar áudio',
                     ),
               const SizedBox(width: 4),
-              // Campo de texto
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1167,7 +1173,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   child: TextField(
                     controller: _messageController,
-                    focusNode: _focusNode,
                     decoration: const InputDecoration(
                       hintText: 'Escreva uma mensagem...',
                       border: InputBorder.none,
@@ -1180,7 +1185,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              // Botão "Problema resolvido" — apenas para clientes
               if (_isCliente)
                 Tooltip(
                   message: 'Problema resolvido — encerrar conversa',
@@ -1200,8 +1204,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           decoration: BoxDecoration(
                             color: const Color(0xFFE8F5E9),
                             shape: BoxShape.circle,
-                            border:
-                                Border.all(color: const Color(0xFF388E3C)),
+                            border: Border.all(color: const Color(0xFF388E3C)),
                           ),
                           child: IconButton(
                             icon: const Icon(
@@ -1214,7 +1217,6 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                 ),
               if (_isCliente) const SizedBox(width: 4),
-              // Botão enviar
               _isSending
                   ? const Padding(
                       padding: EdgeInsets.all(10),
@@ -1253,14 +1255,12 @@ class _ChatScreenState extends State<ChatScreen> {
       child: SafeArea(
         child: Row(
           children: [
-            // Cancelar
             IconButton(
               icon: const Icon(Icons.close),
               onPressed: _cancelarGravacao,
               color: AppColors.textSecondary,
               tooltip: 'Cancelar',
             ),
-            // Indicador de gravação
             Expanded(
               child: Row(
                 children: [
@@ -1292,7 +1292,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 ],
               ),
             ),
-            // Enviar áudio
             _isUploadingAudio
                 ? const Padding(
                     padding: EdgeInsets.all(10),
@@ -1322,7 +1321,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _realtimeService.stop();
     _messageController.dispose();
     _scrollController.dispose();
-    _focusNode.dispose();
     _recordingTimer?.cancel();
     _audioRecorder.dispose();
     super.dispose();
@@ -1359,9 +1357,16 @@ class _ImageViewerPage extends StatelessWidget {
             errorBuilder: (ctx, err, stack) => const Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48),
+                Icon(
+                  Icons.broken_image_outlined,
+                  color: Colors.white54,
+                  size: 48,
+                ),
                 SizedBox(height: 8),
-                Text('Imagem indisponível', style: TextStyle(color: Colors.white54)),
+                Text(
+                  'Imagem indisponível',
+                  style: TextStyle(color: Colors.white54),
+                ),
               ],
             ),
           ),
@@ -1419,7 +1424,7 @@ class _AudioBubbleState extends State<_AudioBubble> {
       final rawUrl = widget.url;
       final audioUrl = rawUrl.startsWith('http')
           ? rawUrl
-          : 'https://apiautoscan.duckdns.org$rawUrl';
+          : '${ApiConfig.baseUrl}$rawUrl';
       await _player.play(UrlSource(audioUrl));
     }
   }
@@ -1460,10 +1465,12 @@ class _AudioBubbleState extends State<_AudioBubble> {
                 SliderTheme(
                   data: SliderThemeData(
                     trackHeight: 2,
-                    thumbShape:
-                        const RoundSliderThumbShape(enabledThumbRadius: 5),
-                    overlayShape:
-                        const RoundSliderOverlayShape(overlayRadius: 8),
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 5,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 8,
+                    ),
                     activeTrackColor: active,
                     inactiveTrackColor: active.withValues(alpha: 0.25),
                     thumbColor: active,

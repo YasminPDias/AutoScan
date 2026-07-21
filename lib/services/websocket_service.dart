@@ -17,8 +17,10 @@ class ChatRealtimeService {
   String? _conversaId;
   Timer? _pollingTimer;
   void Function(Map<String, dynamic>)? _onWsMessageCallback;
+  void Function(String leitorId)? _onMensagensLidasCallback;
   bool _wsConnected = false;
   Function(dynamic)? _novaMensagemListener;
+  Function(dynamic)? _mensagensLidasListener;
 
   bool get isWsConnected => _wsConnected;
 
@@ -29,20 +31,23 @@ class ChatRealtimeService {
   /// - [onFetch]: função que busca a lista de mensagens via HTTP.
   /// - [onUpdate]: callback chamado com a lista atualizada a cada poll.
   /// - [onWsMessage]: callback opcional para mensagens recebidas via WS.
+  /// - [onMensagensLidas]: callback opcional, chamado com o id de quem leu,
+  ///   toda vez que o outro participante visualiza as mensagens dessa conversa.
   Future<void> start({
     required String token,
     required String conversaId,
     required Future<List<Map<String, dynamic>>> Function() onFetch,
     required void Function(List<Map<String, dynamic>>) onUpdate,
     void Function(Map<String, dynamic>)? onWsMessage,
+    void Function(String leitorId)? onMensagensLidas,
   }) async {
     _conversaId = conversaId;
     _onWsMessageCallback = onWsMessage;
+    _onMensagensLidasCallback = onMensagensLidas;
 
-    // idempotente: se a conexão compartilhada já existe, não abre outra
-    socketService.conectar(token);
-
+   socketService.conectar(token);
     final socket = socketService.socket;
+
     if (socket == null) {
       loggerService.w('Socket indisponível — polling ativo');
       _startPolling(onFetch, onUpdate);
@@ -50,6 +55,8 @@ class ChatRealtimeService {
     }
 
     socket.emit('entrarChat', conversaId);
+    loggerService.d('[DEBUG] socket connected: ${socket?.connected}, emitindo entrarChat: $conversaId');
+
     _wsConnected = socket.connected;
     if (_wsConnected) {
       loggerService.i('Entrou na sala da conversa $conversaId (WS já conectado)');
@@ -58,12 +65,16 @@ class ChatRealtimeService {
     _novaMensagemListener = (data) => _handleNovaMensagem(data);
     socket.on('novaMensagem', _novaMensagemListener!);
 
+    _mensagensLidasListener = (data) => _handleMensagensLidas(data);
+    socket.on('mensagensLidas', _mensagensLidasListener!);
+
     socket.on('connect', (_) {
       _wsConnected = true;
       _pollingTimer?.cancel();
       loggerService.i('WebSocket conectado (conversa $conversaId)');
       // reenvia entrarChat: se a conexão caiu e reconectou, a sala precisa
-      // ser reafirmada (socket.io não lembra salas entre reconexões)
+      // ser reafirmada (socket.io não lembra salas entre reconexões) — isso
+      // também refaz o "catch up" de mensagens lidas no backend
       socket.emit('entrarChat', conversaId);
     });
 
@@ -92,6 +103,15 @@ class ChatRealtimeService {
     _onWsMessageCallback?.call(mensagem);
   }
 
+  void _handleMensagensLidas(dynamic data) {
+    if (data is! Map) return;
+    final payload = Map<String, dynamic>.from(data);
+    if (payload['conversaId'] != _conversaId) return;
+
+    final leitorId = payload['leitorId'] as String?;
+    if (leitorId != null) _onMensagensLidasCallback?.call(leitorId);
+  }
+
   void _startPolling(
     Future<List<Map<String, dynamic>>> Function() onFetch,
     void Function(List<Map<String, dynamic>>) onUpdate,
@@ -116,6 +136,9 @@ class ChatRealtimeService {
       socket.emit('sairChat', _conversaId);
       if (_novaMensagemListener != null) {
         socket.off('novaMensagem', _novaMensagemListener);
+      }
+      if (_mensagensLidasListener != null) {
+        socket.off('mensagensLidas', _mensagensLidasListener);
       }
     }
     _wsConnected = false;

@@ -1,48 +1,83 @@
-/// Rastreia mensagens não lidas por conversa (em memória durante a sessão).
+import 'package:flutter/foundation.dart';
+import 'chat_service.dart';
+
+/// Rastreador de mensagens não lidas por conversa.
 ///
-/// Uso:
-///   - [updateLatest]: chamado ao carregar preview de mensagens
-///   - [markRead]: chamado ao abrir um chat
-///   - [hasUnread]: verifica se há mensagens novas não lidas
-///   - [totalUnread]: total de conversas com mensagens não lidas
+/// Cache em memória da contagem real que vem do backend
+/// (GET /conversas/nao-lidas), atualizada:
+///   - ao realizar login ou iniciar o app (ChatReadTracker.carregarDaApi)
+///   - ao abrir a lista (ChatHistoryScreen._carregarConversas)
+///   - em tempo real via evento conversaAtualizada/novoChamado (socket)
+///   - ao abrir uma conversa (zera localmente)
+///
+/// O [notifier] permite que widgets (ex: AppSidebar) se reconstruam
+/// automaticamente via ValueListenableBuilder quando o tracker muda,
+/// sem precisar de setState ou callbacks manuais.
 class ChatReadTracker {
-  ChatReadTracker._();
+  // conversaId -> quantidade de mensagens não lidas
+  static final Map<String, int> _naoLidas = {};
 
-  // conversaId → timestamp da última mensagem conhecida
-  static final Map<String, DateTime> _latestMessage = {};
+  /// Escuta esse notifier pra reconstruir automaticamente quando o badge muda.
+  /// Valor = total de conversas com pelo menos uma mensagem não lida.
+  static final ValueNotifier<int> notifier = ValueNotifier<int>(0);
 
-  // conversaId → timestamp da última vez que o usuário abriu o chat
-  static final Map<String, DateTime> _lastRead = {};
+  static void _notificar() {
+    notifier.value = totalUnread;
+  }
 
-  /// Atualiza o timestamp da mensagem mais recente para uma conversa.
-  static void updateLatest(String conversaId, DateTime messageTime) {
-    final current = _latestMessage[conversaId];
-    if (current == null || messageTime.isAfter(current)) {
-      _latestMessage[conversaId] = messageTime;
+  /// Busca as mensagens/conversas não lidas da API (GET /conversas/nao-lidas)
+  /// e atualiza o badge automaticamente.
+  static Future<void> carregarDaApi(String token) async {
+    try {
+      final res = await ChatService.buscarNaoLidas(token: token);
+      if (res['success'] == true && res['data'] is List) {
+        final list = (res['data'] as List)
+            .map((e) => e is Map<String, dynamic> ? e : Map<String, dynamic>.from(e as Map))
+            .toList();
+        popularDoBackend(list);
+      }
+    } catch (_) {}
+  }
+
+  /// Substitui o mapa inteiro com os dados vindos do backend.
+  /// Chama isso logo após carregar a lista de conversas.
+  static void popularDoBackend(List<Map<String, dynamic>> dados) {
+    _naoLidas.clear();
+    for (final item in dados) {
+      final id = (item['conversaId'] ?? item['id'] ?? item['_id'])?.toString();
+      final count = int.tryParse(
+            (item['naoLidas'] ?? item['count'] ?? item['total'] ?? item['unread'] ?? '0')
+                .toString(),
+          ) ??
+          0;
+      if (id != null && count > 0) {
+        _naoLidas[id] = count;
+      }
     }
+    _notificar();
   }
 
-  /// Marca a conversa como lida agora.
+  /// Chamado quando chega evento de socket (nova mensagem ou novo chamado) —
+  /// incrementa sem precisar rebater na API.
+  static void incrementar(String conversaId) {
+    _naoLidas[conversaId] = (_naoLidas[conversaId] ?? 0) + 1;
+    _notificar();
+  }
+
+  /// Chamado ao abrir uma conversa — zera localmente na hora (UX imediata).
   static void markRead(String conversaId) {
-    _lastRead[conversaId] = DateTime.now();
+    _naoLidas.remove(conversaId);
+    _notificar();
   }
 
-  /// Retorna true se há mensagens mais novas do que a última leitura.
+  /// Tem mensagens não lidas nessa conversa?
   static bool hasUnread(String conversaId) {
-    final latest = _latestMessage[conversaId];
-    if (latest == null) return false;
-    final read = _lastRead[conversaId];
-    if (read == null) return true; // nunca aberto
-    return latest.isAfter(read);
+    return (_naoLidas[conversaId] ?? 0) > 0;
   }
 
-  /// Número de conversas com mensagens não lidas.
-  static int get totalUnread =>
-      _latestMessage.keys.where((id) => hasUnread(id)).length;
+  /// Total de conversas com pelo menos uma não lida (pra badge do sidebar).
+  static int get totalUnread => _naoLidas.values.where((n) => n > 0).length;
 
-  /// Limpa todos os dados (ex: ao fazer logout).
-  static void clear() {
-    _latestMessage.clear();
-    _lastRead.clear();
-  }
+  /// Contagem exata de não lidas numa conversa específica.
+  static int countFor(String conversaId) => _naoLidas[conversaId] ?? 0;
 }

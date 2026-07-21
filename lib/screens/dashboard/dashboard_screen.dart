@@ -6,6 +6,7 @@ import '../../widgets_defaults/diagnostic_item.dart';
 import '../../services/auth_storage.dart';
 import '../../services/diagnostic_service.dart';
 import '../../services/chat_service.dart';
+import '../../services/dashboard_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -22,7 +23,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _totalDiagnosticos = 0;
   int _pendentes = 0;
   int _resolvidos = 0;
-  int _inconclusivos = 0;
+  int _emAberto = 0;
   int _conversasAbertas = 0;
 
   // Listas
@@ -57,8 +58,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         (role ?? '').toUpperCase() == 'ADMIN' ||
         (role ?? '').toUpperCase() == 'ASSISTENTE';
 
-    // Carrega diagnósticos e conversas em paralelo
+    // Carrega resumo do dashboard, histórico semanal, histórico de diagnósticos e conversas em paralelo
     final futures = <Future>[
+      DashboardService.buscarResumoDiagnosticos(token: token),
+      DashboardService.buscarHistoricoSemanal(token: token),
       isAdmin
           ? DiagnosticService.buscarTodoHistorico(token: token)
           : DiagnosticService.buscarMeuHistorico(token: token),
@@ -68,10 +71,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final results = await Future.wait(futures);
     if (!mounted) return;
 
-    final diagResult = results[0] as Map<String, dynamic>;
-    final List<Map<String, dynamic>> diagnosticos = [];
+    final summaryResult = results[0] as Map<String, dynamic>;
+    final histResult = results[1] as Map<String, dynamic>;
+    final diagResult = results[2] as Map<String, dynamic>;
 
-    if (diagResult['success'] == true) {
+    // Estatísticas da API
+    int total = 0;
+    int pendentes = 0;
+    int resolvidos = 0;
+    int emAberto = 0;
+
+    if (summaryResult['success'] == true && summaryResult['data'] != null) {
+      final data = summaryResult['data'] as Map<String, dynamic>;
+      total = int.tryParse(data['total']?.toString() ?? '0') ?? 0;
+      pendentes = int.tryParse(data['pendentes']?.toString() ?? '0') ?? 0;
+      resolvidos = int.tryParse(data['resolvidos']?.toString() ?? '0') ?? 0;
+      emAberto = int.tryParse(data['emAberto']?.toString() ?? '0') ?? 0;
+    }
+
+    // Histórico por dia (últimos 7 dias) da API
+    final Map<String, int> porDia = {};
+    final hoje = DateTime.now();
+    // Inicializa com zero os últimos 7 dias por segurança
+    for (int i = 6; i >= 0; i--) {
+      final dia = hoje.subtract(Duration(days: i));
+      final key = _diaKey(dia);
+      porDia[key] = 0;
+    }
+
+    if (histResult['success'] == true && histResult['data'] != null) {
+      final List rawList = histResult['data'] as List;
+      for (final item in rawList) {
+        if (item is Map<String, dynamic>) {
+          final dataStr = item['data']?.toString() ?? '';
+          final totalVal = int.tryParse(item['total']?.toString() ?? '0') ?? 0;
+          if (dataStr.isNotEmpty) {
+            porDia[dataStr] = totalVal;
+          }
+        }
+      }
+    }
+
+    // Diagnósticos para extrair a lista física de casos em aberto
+    final List<Map<String, dynamic>> diagnosticos = [];
+    if (diagResult['success'] == true && diagResult['data'] != null) {
       final rawList = diagResult['data'] as List;
       for (final item in rawList) {
         if (item is Map<String, dynamic>) diagnosticos.add(item);
@@ -80,9 +123,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     // Conta conversas abertas (admin)
     int conversasAbertas = 0;
-    if (isAdmin && results.length > 1) {
-      final convResult = results[1] as Map<String, dynamic>;
-      if (convResult['success'] == true) {
+    if (isAdmin && results.length > 3) {
+      final convResult = results[3] as Map<String, dynamic>;
+      if (convResult['success'] == true && convResult['data'] != null) {
         final convList = convResult['data'] as List;
         conversasAbertas = convList.where((c) {
           final status = (c as Map<String, dynamic>)['status']?.toString() ?? '';
@@ -91,50 +134,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
 
-    // Estatísticas
-    int total = diagnosticos.length;
-    int pendentes = 0;
-    int resolvidos = 0;
-    int inconclusivos = 0;
+    // Casos em aberto para listagem (status diferente de CONCLUIDO)
     final List<Map<String, dynamic>> casosAbertos = [];
-    final Map<String, int> porDia = {};
-
-    final hoje = DateTime.now();
-    // Inicializa os últimos 7 dias com zero
-    for (int i = 6; i >= 0; i--) {
-      final dia = hoje.subtract(Duration(days: i));
-      final key = _diaKey(dia);
-      porDia[key] = 0;
-    }
-
     for (final item in diagnosticos) {
       final status = item['status']?.toString() ?? '';
-      final createdAt = item['createdAt']?.toString() ?? '';
-
-      switch (status) {
-        case 'CONCLUIDO':
-          resolvidos++;
-          break;
-        case 'INCONCLUSIVO':
-          inconclusivos++;
-          casosAbertos.add(item);
-          break;
-        case 'PENDENTE':
-        case 'EM_ANALISE':
-        default:
-          if (status.isNotEmpty) pendentes++;
-          casosAbertos.add(item);
-      }
-
-      // Agrupa por dia (últimos 7 dias)
-      if (createdAt.isNotEmpty) {
-        try {
-          final dt = DateTime.parse(createdAt);
-          final key = _diaKey(dt);
-          if (porDia.containsKey(key)) {
-            porDia[key] = (porDia[key] ?? 0) + 1;
-          }
-        } catch (_) {}
+      if (status != 'CONCLUIDO') {
+        casosAbertos.add(item);
       }
     }
 
@@ -150,7 +155,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _totalDiagnosticos = total;
         _pendentes = pendentes;
         _resolvidos = resolvidos;
-        _inconclusivos = inconclusivos;
+        _emAberto = emAberto;
         _conversasAbertas = conversasAbertas;
         _casosAbertos = casosAbertos.take(5).toList();
         _porDia = porDia;
@@ -279,8 +284,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       _StatData(
         icon: Icons.warning_amber_outlined,
-        value: '$_inconclusivos',
-        label: 'Inconclusivos',
+        value: '$_emAberto',
+        label: 'Casos em Aberto',
         color: const Color(0xFFF9A825),
       ),
       if (_isAdminOrAssistente)

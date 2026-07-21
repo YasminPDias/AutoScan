@@ -311,7 +311,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
-                            onPressed: () {},
+                            onPressed: () async {
+                              final result = await Navigator.pushNamed(
+                                context,
+                                '/edit-profile',
+                              );
+                              if (result == true) {
+                                await _loadUserData();
+                              }
+                            },
                             icon: const Icon(Icons.edit, size: 20),
                             label: const Text('Editar Perfil'),
                           ),
@@ -453,7 +461,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   icon: Icons.lock,
                   title: 'Alterar Senha',
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.pushNamed(context, '/change-password');
+                  },
                 ),
                 _buildSettingItem(
                   icon: Icons.help,
@@ -504,7 +514,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     IconButton(
                       icon: const Icon(Icons.edit, color: Colors.white),
-                      onPressed: () {},
+                      onPressed: () async {
+                        final result = await Navigator.pushNamed(
+                          context,
+                          '/edit-profile',
+                        );
+                        if (result == true) {
+                          await _loadUserData();
+                        }
+                      },
                     ),
                   ],
                 ),
@@ -640,7 +658,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   icon: Icons.lock,
                   title: 'Alterar Senha',
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.pushNamed(context, '/change-password');
+                  },
                 ),
                 _buildSettingItem(
                   icon: Icons.help,

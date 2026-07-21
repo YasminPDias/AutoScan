@@ -18,6 +18,7 @@ class _AppDrawerState extends State<AppDrawer> {
   String _userName = 'Usuário';
   String _userEmail = '';
   String _userRole = '';
+  bool _isEmpresaAdmin = false;
   Uint8List? _profilePhotoBytes;
   String? _profilePhotoUrl;
   bool _photoLoadFailed = false;
@@ -126,6 +127,7 @@ class _AppDrawerState extends State<AppDrawer> {
     final email = await AuthStorage.getUserEmail();
     final photo = await AuthStorage.getUserProfilePhoto();
     final role = await AuthStorage.getUserRole();
+    final isEmpAdmin = await AuthStorage.isEmpresaAdmin();
 
     Uint8List? photoBytes;
     String? photoUrl;
@@ -140,6 +142,7 @@ class _AppDrawerState extends State<AppDrawer> {
         _userName = name ?? 'Usuário';
         _userEmail = email ?? '';
         _userRole = role ?? '';
+        _isEmpresaAdmin = isEmpAdmin;
         _profilePhotoBytes = photoBytes;
         _profilePhotoUrl = photoUrl;
         _photoLoadFailed = false;
@@ -231,6 +234,15 @@ class _AppDrawerState extends State<AppDrawer> {
                     Navigator.pushReplacementNamed(context, '/dashboard');
                   },
                 ),
+                if (_isEmpresaAdmin)
+                  ListTile(
+                    leading: const Icon(Icons.business),
+                    title: const Text('Empresa'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushReplacementNamed(context, '/empresa/funcionarios');
+                    },
+                  ),
                 if (_isAdminOrAssistente)
                   ListTile(
                     leading: const Icon(Icons.support_agent),
@@ -238,6 +250,15 @@ class _AppDrawerState extends State<AppDrawer> {
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.pushReplacementNamed(context, '/chat-history');
+                    },
+                  ),
+                if (_userRole.toUpperCase() == 'ADMIN')
+                  ListTile(
+                    leading: const Icon(Icons.manage_accounts),
+                    title: const Text('Gestão de Usuários'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushReplacementNamed(context, '/admin/users');
                     },
                   ),
                 const Divider(),

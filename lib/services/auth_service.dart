@@ -422,13 +422,168 @@ class AuthService {
     }
   }
 
-  /// Ponto único de logout — desregistra o push, desconecta o socket, limpa
-  /// a sessão salva, e navega pro login. Chama isso em vez de duplicar essas
-  /// quatro etapas em cada tela que tem um botão de sair.
+  static Future<Map<String, dynamic>> atualizarPerfil({
+    required String token,
+    required String nome,
+    required String sobrenome,
+    required String telefone,
+    String? fotoPerfil,
+    List<int>? fotoPerfilArquivoBytes,
+    String? fotoPerfilArquivoNome,
+  }) async {
+    loggerService.d('Atualizando perfil do usuário');
+    final nomeCompleto = '$nome $sobrenome'.trim();
+
+    final endpoint = Uri.parse('${ApiConfig.baseUrl}/auth/perfil');
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+
+    http.Response? response;
+    final hasArquivo =
+        fotoPerfilArquivoBytes != null && fotoPerfilArquivoBytes.isNotEmpty;
+
+    if (hasArquivo) {
+      final request = http.MultipartRequest('PUT', endpoint)
+        ..headers.addAll({'Authorization': 'Bearer $token'})
+        ..fields['nome'] = nome
+        ..fields['sobrenome'] = sobrenome
+        ..fields['telefone'] = telefone;
+
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'fotoPerfilArquivo',
+          fotoPerfilArquivoBytes,
+          filename:
+              (fotoPerfilArquivoNome != null &&
+                  fotoPerfilArquivoNome.trim().isNotEmpty)
+              ? fotoPerfilArquivoNome.trim()
+              : 'perfil.jpg',
+        ),
+      );
+
+      final streamed = await request.send();
+      response = await http.Response.fromStream(streamed);
+    } else {
+      final Map<String, dynamic> body = {
+        'nome': nome,
+        'sobrenome': sobrenome,
+        'telefone': telefone,
+      };
+
+      if (fotoPerfil != null && fotoPerfil.isNotEmpty) {
+        body['fotoPerfil'] = 'data:image/jpeg;base64,$fotoPerfil';
+      }
+
+      response = await http.put(
+        endpoint,
+        headers: headers,
+        body: jsonEncode(body),
+      );
+    }
+
+    loggerService.d('Resposta de atualização - Status: ${response.statusCode}');
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      // Atualizar dados locais após sucesso
+      await AuthStorage.saveUser(
+        name: nomeCompleto,
+        phone: telefone,
+      );
+      
+      return {'success': true};
+    } else {
+      String message = 'Erro ao atualizar perfil. (${response.statusCode})';
+      try {
+        final data = jsonDecode(response.body);
+        if (data is Map) {
+          message = data['message'] ?? data['error'] ?? message;
+        } else if (data is String) {
+          message = data;
+        }
+      } catch (_) {
+        if (response.body.isNotEmpty) {
+          message = '${response.statusCode}: ${response.body}';
+        }
+      }
+      return {'success': false, 'message': message};
+    }
+  }
+
+  static Future<Map<String, dynamic>> alterarSenha({
+    required String token,
+    required String senhaAtual,
+    required String novaSenha,
+    required String confirmarNovaSenha,
+  }) async {
+    loggerService.d('Iniciando alteração de senha');
+
+    final endpoint = Uri.parse('${ApiConfig.baseUrl}/auth/senha');
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+
+    final body = jsonEncode({
+      'senhaAtual': senhaAtual,
+      'novaSenha': novaSenha,
+      'confirmarNovaSenha': confirmarNovaSenha,
+    });
+
+    try {
+      final response = await http.put(
+        endpoint,
+        headers: headers,
+        body: body,
+      );
+
+      loggerService.d('Resposta de alterar senha - Status: ${response.statusCode}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {'success': true};
+      } else {
+        String message = 'Erro ao alterar senha. (${response.statusCode})';
+        try {
+          final data = jsonDecode(response.body);
+          if (data is Map) {
+            message = data['message'] ?? data['error'] ?? message;
+          }
+        } catch (_) {}
+        return {'success': false, 'message': message};
+      }
+    } catch (e) {
+      loggerService.e('Erro de conexão ao alterar senha: $e');
+      return {'success': false, 'message': 'Erro de conexão. Tente novamente.'};
+    }
+  }
+
+  /// Ponto único de logout — invalida a sessão no backend, desregistra o
+  /// push, desconecta o socket, limpa a sessão salva, e navega pro login.
   static Future<void> logout(BuildContext context) async {
-    await pushService.desregistrar(); // precisa do token ainda válido, por isso vem antes do clear
+    final token = await AuthStorage.getToken();
+
+    // invalida a sessão no Redis do backend — qualquer outro dispositivo
+    // com o mesmo token recebe 401 na próxima requisição e é deslogado
+    // automaticamente pelo ApiClient
+    if (token != null) {
+      try {
+        await http.post(
+          Uri.parse('${ApiConfig.baseUrl}/auth/logout'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        );
+      } catch (_) {
+        // falha de rede não impede o logout local
+      }
+    }
+
+    await pushService.desregistrar(); // precisa do token ainda válido
     socketService.desconectar();
     await AuthStorage.clear();
+
     if (context.mounted) {
       Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
     }

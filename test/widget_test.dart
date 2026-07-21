@@ -13,7 +13,7 @@ import 'package:autex/main.dart';
 void main() {
   testWidgets('App launches successfully', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const AutexApp());
+    await tester.pumpWidget(const AutexApp(initialRoute: '/login'));
 
     // Verify that the app launches successfully
     expect(find.byType(MaterialApp), findsOneWidget);

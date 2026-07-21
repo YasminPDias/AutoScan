@@ -9,16 +9,22 @@ import 'screens/register/register_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/profile/profile_screen.dart';
+import 'screens/profile/edit_profile_screen.dart';
+import 'screens/profile/change_password_screen.dart';
 import 'screens/history/history_screen.dart';
 import 'screens/diagnostic/diagnostic_screen.dart';
 import 'screens/diagnostic/diagnostic_result_screen.dart';
 import 'screens/plans/plans_screen.dart';
 import 'screens/chat/chat_screen.dart';
 import 'screens/chat/chat_history_screen.dart';
+import 'screens/empresa/criar_empresa_screen.dart';
+import 'screens/empresa/empresa_funcionario_screen.dart';
+import 'screens/admin/users_screen.dart';
 import 'services/auth_storage.dart';
 import 'services/logger_service.dart';
 import 'services/socket_service.dart';
 import 'services/push_service.dart';
+import 'services/chat_read_tracker.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,13 +37,11 @@ void main() async {
   final loggedIn = await AuthStorage.isLoggedIn();
 
   if (loggedIn) {
-    // app reaberto com sessão já ativa (não passou pela tela de login agora) —
-    // conecta direto, sem esperar a ação de login.
-    // TODO: ajusta 'getToken' pro método real de pegar o token no AuthStorage
     final token = await AuthStorage.getToken();
     if (token != null) {
       socketService.conectar(token);
       await pushService.inicializar();
+      await ChatReadTracker.carregarDaApi(token);
     }
   }
 
@@ -75,12 +79,17 @@ class AutexApp extends StatelessWidget {
         '/home': (context) => const HomeScreen(),
         '/dashboard': (context) => const DashboardScreen(),
         '/profile': (context) => const ProfileScreen(),
+        '/edit-profile': (context) => const EditProfileScreen(),
         '/history': (context) => const HistoryScreen(),
         '/diagnostic': (context) => const DiagnosticScreen(),
         '/diagnostic-result': (context) => const DiagnosticResultScreen(),
         '/plans': (context) => const PlansScreen(),
         '/chat': (context) => const ChatScreen(),
         '/chat-history': (context) => const ChatHistoryScreen(),
+        '/change-password': (context) => const ChangePasswordScreen(),
+        '/empresa/criar': (context) => const CriarEmpresaScreen(),
+        '/empresa/funcionarios': (context) => const EmpresaFuncionariosScreen(),
+        '/admin/users': (context) => const UsersScreen(),
       },
     );
   }
