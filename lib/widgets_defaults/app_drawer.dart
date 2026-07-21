@@ -231,6 +231,14 @@ class _AppDrawerState extends State<AppDrawer> {
                     Navigator.pushReplacementNamed(context, '/dashboard');
                   },
                 ),
+                ListTile(
+                  leading: const Icon(Icons.business),
+                  title: const Text('Empresa'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.pushReplacementNamed(context, '/empresa/funcionarios');
+                  },
+                ),
                 if (_isAdminOrAssistente)
                   ListTile(
                     leading: const Icon(Icons.support_agent),

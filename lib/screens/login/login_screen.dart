@@ -6,6 +6,7 @@ import '../../services/auth_service.dart';
 import '../../services/auth_storage.dart';
 import '../../services/socket_service.dart';
 import '../../services/push_service.dart';
+import '../../services/empresa/empresa_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -232,6 +233,21 @@ class _LoginScreenState extends State<LoginScreen> {
         final isSameUser =
             currentEmail != null && currentEmail.trim() == userEmail.trim();
 
+        bool isEmpresaAdmin = false;
+        try {
+          if (token.isNotEmpty) {
+            final minhaEmpresaRes = await EmpresaService.buscarMinhaEmpresa(token: token);
+            if (minhaEmpresaRes['success'] == true) {
+              final data = minhaEmpresaRes['data'];
+              if (data != null && data['papel'] == 'ADMIN') {
+                isEmpresaAdmin = true;
+              }
+            }
+          }
+        } catch (_) {
+          // ignore error and proceed
+        }
+
         await AuthStorage.saveUser(
           id: userId,
           name: resolvedFullName.isNotEmpty
@@ -246,6 +262,7 @@ class _LoginScreenState extends State<LoginScreen> {
           role: userRole.isNotEmpty ? userRole : null,
           phone: userPhone.isNotEmpty ? userPhone : null,
           memberSince: userMemberSince.isNotEmpty ? userMemberSince : null,
+          isEmpresaAdmin: isEmpresaAdmin,
         );
         if (!mounted) return;
 
@@ -254,6 +271,7 @@ class _LoginScreenState extends State<LoginScreen> {
           await pushService.inicializar();
         }
 
+        if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/home');
       } else {
         setState(

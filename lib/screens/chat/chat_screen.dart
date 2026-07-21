@@ -120,7 +120,6 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       return;
     }
-
     _conversaId = conversaId;
     ChatReadTracker.markRead(conversaId);
 
@@ -176,13 +175,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
                 if (idxPendente != -1) {
                   setState(() => _mensagens[idxPendente] = msg);
-                  _scrollToBottom();
+                  
                   return;
                 }
               }
 
               setState(() => _mensagens.add(msg));
-              _scrollToBottom();
+            
             }
           } catch (_) {}
         }

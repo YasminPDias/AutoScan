@@ -48,11 +48,17 @@ class SocketService {
     _socket!.on('connect', (_) => loggerService.i('Socket conectado'));
     _socket!.on('disconnect', (_) => loggerService.w('Socket desconectado'));
     _socket!.on('connect_error', (e) {
-      loggerService.e('Erro de conexão do socket: $e');
+      String mensagem = '';
+      if (e is Map) {
+        mensagem = e['message']?.toString() ?? e.toString();
+      } else {
+        mensagem = e?.toString() ?? '';
+      }
+
+      loggerService.w('Erro de conexão do socket: $mensagem');
 
       // se o erro for de sessão encerrada (token inválido ou expirado no Redis),
       // redireciona pro login — mesmo caminho que o ApiClient usa no 401
-      final mensagem = e?.toString() ?? '';
       if (mensagem.contains('Sessão encerrada') ||
           mensagem.contains('Token inválido') ||
           mensagem.contains('Token não fornecido')) {
