@@ -155,7 +155,6 @@ class _EmpresaFuncionariosScreenState extends State<EmpresaFuncionariosScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // header
               Row(
                 children: [
                   Column(
@@ -248,8 +247,9 @@ class _EmpresaFuncionariosScreenState extends State<EmpresaFuncionariosScreen> {
         final id = usuario['id']?.toString() ?? '';
         final nome = '${usuario['nome'] ?? ''} ${usuario['sobrenome'] ?? ''}'.trim();
         final email = usuario['email']?.toString() ?? '';
-        final papel = membro['papel']?.toString() ?? 'MEMBRO';
-        final isAdmin = papel == 'ADMIN';
+        final papel = membro['papel']?.toString() ?? 'FUNCIONARIO_EMPRESA';
+        // agora o backend retorna ADMIN_EMPRESA ou FUNCIONARIO_EMPRESA
+        final isAdmin = papel == 'ADMIN_EMPRESA';
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -261,7 +261,6 @@ class _EmpresaFuncionariosScreenState extends State<EmpresaFuncionariosScreen> {
           ),
           child: Row(
             children: [
-              // avatar
               Container(
                 width: 44, height: 44,
                 decoration: BoxDecoration(
@@ -277,7 +276,6 @@ class _EmpresaFuncionariosScreenState extends State<EmpresaFuncionariosScreen> {
                 ),
               ),
               const SizedBox(width: 16),
-              // info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -310,7 +308,6 @@ class _EmpresaFuncionariosScreenState extends State<EmpresaFuncionariosScreen> {
                   ],
                 ),
               ),
-              // ações — não permite remover admin
               if (!isAdmin)
                 IconButton(
                   icon: const Icon(Icons.person_remove_outlined, color: AppColors.textLight),
@@ -347,14 +344,16 @@ class _ModalAdicionarFuncionarioState extends State<_ModalAdicionarFuncionario> 
   final _emailController = TextEditingController();
   final _telefoneController = TextEditingController();
   final _senhaController = TextEditingController();
-  String _papel = 'MEMBRO';
+
+  // valores agora batem com o enum do backend
+  String _papel = 'FUNCIONARIO_EMPRESA';
   bool _isLoading = false;
   bool _senhaVisivel = false;
 
   @override
   void initState() {
     super.initState();
-    _gerarSenha(); // gera senha automática ao abrir o modal
+    _gerarSenha();
   }
 
   @override
@@ -472,14 +471,13 @@ class _ModalAdicionarFuncionarioState extends State<_ModalAdicionarFuncionario> 
                 _buildCampo(_telefoneController, 'Telefone',
                     keyboardType: TextInputType.phone),
 
-                // senha gerada automaticamente
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: TextFormField(
                     controller: _senhaController,
                     obscureText: !_senhaVisivel,
                     decoration: InputDecoration(
-                      labelText: 'Senha temporária *',
+                      labelText: 'Senha *',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -500,7 +498,7 @@ class _ModalAdicionarFuncionarioState extends State<_ModalAdicionarFuncionario> 
                           ),
                           IconButton(
                             icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
-                            onPressed: _gerarSenha,
+                            onPressed: () => setState(_gerarSenha),
                             tooltip: 'Gerar nova senha',
                           ),
                         ],
@@ -526,13 +524,13 @@ class _ModalAdicionarFuncionarioState extends State<_ModalAdicionarFuncionario> 
                       Row(
                         children: [
                           Expanded(
-                            child: _buildPapelOption('MEMBRO', 'Membro',
-                                'Usa o sistema normalmente'),
+                            child: _buildPapelOption(
+                              'FUNCIONARIO_EMPRESA', 'Membro', 'Usa o sistema normalmente'),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: _buildPapelOption('ADMIN', 'Admin',
-                                'Gerencia funcionários'),
+                            child: _buildPapelOption(
+                              'ADMIN_EMPRESA', 'Admin', 'Gerencia funcionários'),
                           ),
                         ],
                       ),
@@ -541,7 +539,6 @@ class _ModalAdicionarFuncionarioState extends State<_ModalAdicionarFuncionario> 
                 ),
                 const SizedBox(height: 16),
 
-                // aviso pra copiar as credenciais
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -549,11 +546,11 @@ class _ModalAdicionarFuncionarioState extends State<_ModalAdicionarFuncionario> 
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.5)),
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
-                      const Icon(Icons.info_outline, color: Color(0xFF856404), size: 18),
-                      const SizedBox(width: 8),
-                      const Expanded(
+                      Icon(Icons.info_outline, color: Color(0xFF856404), size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
                         child: Text(
                           'Copie a senha antes de salvar — ela não será mostrada novamente.',
                           style: TextStyle(fontSize: 12, color: Color(0xFF856404)),
