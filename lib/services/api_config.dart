@@ -7,13 +7,13 @@ class ApiConfig {
   // pelo IP da sua máquina na rede local (ex: 192.168.0.x), ou pelo domínio
   // real quando for testar contra a VPS/produção.
   static String get baseUrl {
-    if (kIsWeb) return 'https://apiautoscan.duckdns.org';
-    if (Platform.isAndroid) return 'https://apiautoscan.duckdns.org';
-    return 'https://apiautoscan.duckdns.org'; // iOS simulator
+    if (kIsWeb) return 'https://autex.app.br/api';
+    if (Platform.isAndroid) return 'https://autex.app.br/api';
+    return 'https://autex.app.br/api'; // iOS simulator
   }
 
-  // o cliente socket.io usa esse mesmo host (ele mesmo cuida do protocolo)
-  static String get wsUrl => baseUrl;
+  // o cliente socket.io usa esse mesmo host, mas sem o sufixo /api que seria interpretado como namespace
+  static String get wsUrl => baseUrl.replaceAll('/api', '');
 
   // Console do Firebase → Configurações do projeto → Cloud Messaging →
   // Configuração da Web → Certificados Web Push → Gerar par de chaves.

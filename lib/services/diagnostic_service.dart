@@ -159,27 +159,45 @@ class DiagnosticService {
     return {'success': false, 'message': _extractError(response.body)};
   }
 
-  /// GET /diagnostico-ia/abertos/me — Buscar diagnósticos em aberto (PENDENTE ou EM_ANALISE) do usuário logado
-  static Future<Map<String, dynamic>> buscarMeusDiagnosticosAbertos({
-    required String token,
-  }) async {
-    loggerService.d('Buscando diagnósticos em aberto do usuário');
-
+  static Future<Map<String, dynamic>> buscarDiagnosticosAbertosAdmin({
+  required String token,
+  int pagina = 1,
+  int porPagina = 10,
+}) async {
+  try {
     final response = await ApiClient.get(
-      '/diagnostico-ia/abertos/me',
+      '/diagnostico-ia/abertos/admin?pagina=$pagina&porPagina=$porPagina',
       token: token,
     );
-
-    loggerService.d('Resposta diagnósticos em aberto - Status: ${response.statusCode}');
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      final data = jsonDecode(response.body);
-      if (data is List) return {'success': true, 'data': data};
-      return {'success': true, 'data': [data]};
+    loggerService.d('buscarDiagnosticosAbertosAdmin → ${response.statusCode}');
+    if (response.statusCode == 200) {
+      return {'success': true, 'data': jsonDecode(response.body)};
     }
     return {'success': false, 'message': _extractError(response.body)};
+  } catch (e) {
+    loggerService.e('buscarDiagnosticosAbertosAdmin erro: $e');
+    return {'success': false, 'message': 'Erro de conexão: $e'};
   }
+}
 
+static Future<Map<String, dynamic>> buscarMeusDiagnosticosAbertos({
+  required String token,
+}) async {
+  loggerService.d('Buscando diagnósticos em aberto do usuário');
+  final response = await ApiClient.get(
+    '/diagnostico-ia/abertos/me',
+    token: token,
+  );
+  loggerService.d('Resposta diagnósticos em aberto - Status: ${response.statusCode}');
+  if (response.statusCode == 200 || response.statusCode == 201) {
+    final data = jsonDecode(response.body);
+    // backend retorna objeto paginado { dados: [...], total, pagina... }
+    if (data is List) return {'success': true, 'data': data};
+    final lista = data['dados'] as List? ?? [];
+    return {'success': true, 'data': lista};
+  }
+  return {'success': false, 'message': _extractError(response.body)};
+}
   /// GET /diagnostico-ia/{id} — Buscar diagnóstico por ID
   static Future<Map<String, dynamic>> buscarDiagnosticoPorId({
     required String token,

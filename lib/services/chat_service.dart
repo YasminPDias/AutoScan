@@ -4,21 +4,19 @@ import 'package:http/http.dart' as http;
 import 'api_config.dart';
 import 'api_client.dart';
 import 'logger_service.dart';
+import '../models/conversa_model.dart';
+
 class ChatService {
-  // POST /conversas — cria uma conversa ligada a um diagnóstico
   static Future<Map<String, dynamic>> criarConversa({
     required String token,
     required String aiDiagnosticoId,
   }) async {
     try {
       final response = await ApiClient.post(
-        '/conversas',
-        token: token,
+        '/conversas', token: token,
         body: {'aiDiagnosticoId': aiDiagnosticoId},
       );
-
       loggerService.d('criarConversa → ${response.statusCode}');
-
       if (response.statusCode == 201 || response.statusCode == 200) {
         return {'success': true, 'data': jsonDecode(response.body)};
       }
@@ -29,112 +27,137 @@ class ChatService {
     }
   }
 
-  // GET /conversas/atendente/me — conversas do cliente logado
+  // GET /conversas/atendente/me
   static Future<Map<String, dynamic>> buscarMinhasConversas({
     required String token,
+    int pagina = 1,
+    int porPagina = 10,
   }) async {
     try {
-      final response = await ApiClient.get('/conversas/atendente/me', token: token);
-
+      final response = await ApiClient.get(
+        '/conversas/atendente/me?pagina=$pagina&porPagina=$porPagina',
+        token: token,
+      );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return {'success': true, 'data': data is List ? data : [data]};
+        if (data is List) {
+          return {'success': true, 'data': data, 'pagina': 1, 'totalPaginas': 1};
+        }
+        // resposta paginada { dados: [...], total, pagina, totalPaginas }
+        final lista = (data['dados'] as List? ?? [])
+            .map((j) => ConversaModel.fromJson(j as Map<String, dynamic>))
+            .toList();
+        return {
+          'success': true,
+          'data': lista,
+          'pagina': data['pagina'] ?? pagina,
+          'totalPaginas': data['totalPaginas'] ?? 1,
+        };
       }
       return {'success': false, 'message': _extractError(response.body)};
     } catch (e) {
+      loggerService.e('buscarMinhasConversas erro: $e');
       return {'success': false, 'message': 'Erro de conexão: $e'};
     }
   }
 
-  // GET /conversas — todas as conversas (ADMIN / ASSISTENTE)
+  // GET /conversas
   static Future<Map<String, dynamic>> buscarTodasConversas({
     required String token,
   }) async {
     try {
       final response = await ApiClient.get('/conversas', token: token);
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return {'success': true, 'data': data is List ? data : [data]};
+        final lista = data is List ? data : (data['dados'] as List? ?? []);
+        return {'success': true, 'data': lista};
       }
       return {'success': false, 'message': _extractError(response.body)};
     } catch (e) {
+      loggerService.e('buscarTodasConversas erro: $e');
       return {'success': false, 'message': 'Erro de conexão: $e'};
     }
   }
 
-  // GET /conversas/abertas — conversas abertas (ADMIN)
+  // GET /conversas/abertas
   static Future<Map<String, dynamic>> buscarConversasAbertas({
     required String token,
   }) async {
     try {
       final response = await ApiClient.get('/conversas/abertas', token: token);
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return {'success': true, 'data': data is List ? data : [data]};
+        final lista = data is List ? data : (data['dados'] as List? ?? []);
+        return {'success': true, 'data': lista};
       }
       return {'success': false, 'message': _extractError(response.body)};
     } catch (e) {
+      loggerService.e('buscarConversasAbertas erro: $e');
       return {'success': false, 'message': 'Erro de conexão: $e'};
     }
   }
 
-  // GET /conversas/{id} — conversa por ID
+  // GET /conversas/{id}
   static Future<Map<String, dynamic>> buscarConversa({
     required String token,
     required String conversaId,
   }) async {
     try {
       final response = await ApiClient.get('/conversas/$conversaId', token: token);
-
       if (response.statusCode == 200) {
         return {'success': true, 'data': jsonDecode(response.body)};
       }
       return {'success': false, 'message': _extractError(response.body)};
     } catch (e) {
+      loggerService.e('buscarConversa erro: $e');
       return {'success': false, 'message': 'Erro de conexão: $e'};
     }
   }
 
- static Future<Map<String, dynamic>> buscarConversaPorDiagnosticoId({
+  // GET /conversas/diagnostico/:id
+  static Future<Map<String, dynamic>> buscarConversaPorDiagnosticoId({
     required String token,
     required String diagnosticoId,
   }) async {
     try {
-      final response = await ApiClient.get('/conversas/diagnostico/$diagnosticoId', token: token);
-
+      final response = await ApiClient.get(
+        '/conversas/diagnostico/$diagnosticoId', token: token,
+      );
       if (response.statusCode == 200) {
         return {'success': true, 'data': jsonDecode(response.body)};
       }
       return {'success': false, 'message': _extractError(response.body)};
     } catch (e) {
+      loggerService.e('buscarConversaPorDiagnosticoId erro: $e');
       return {'success': false, 'message': 'Erro de conexão: $e'};
     }
   }
-  
-  // GET /chat/diagnostico/{conversaId} — mensagens da conversa
+
+  // GET /chat/diagnostico/{conversaId}
   static Future<Map<String, dynamic>> buscarMensagens({
     required String token,
     required String conversaId,
+    int pagina = 1,
+    int porPagina = 20,
   }) async {
     try {
       final response = await ApiClient.get(
-        '/chat/diagnostico/$conversaId',
+        '/chat/diagnostico/$conversaId?pagina=$pagina&porPagina=$porPagina',
         token: token,
       );
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return {'success': true, 'data': data is List ? data : [data]};
+        // retorna o objeto paginado inteiro — o caller decide o que fazer
+        return {'success': true, 'data': data};
       }
       return {'success': false, 'message': _extractError(response.body)};
     } catch (e) {
+      loggerService.e('buscarMensagens erro: $e');
       return {'success': false, 'message': 'Erro de conexão: $e'};
     }
   }
 
-  // POST /chat/upload-arquivo — multipart, fica com http direto (ApiClient não cobre)
+  // POST /chat/upload-arquivo
   static Future<Map<String, dynamic>> uploadArquivo({
     required String token,
     required Uint8List bytes,
@@ -142,19 +165,15 @@ class ChatService {
   }) async {
     try {
       final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('${ApiConfig.baseUrl}/chat/upload-arquivo'),
+        'POST', Uri.parse('${ApiConfig.baseUrl}/chat/upload-arquivo'),
       );
       request.headers['Authorization'] = 'Bearer $token';
       request.files.add(
         http.MultipartFile.fromBytes('arquivo', bytes, filename: fileName),
       );
-
       final streamed = await request.send();
       final body = await streamed.stream.bytesToString();
-
       loggerService.d('uploadArquivo → ${streamed.statusCode}');
-
       if (streamed.statusCode == 201 || streamed.statusCode == 200) {
         return {'success': true, 'data': jsonDecode(body)};
       }
@@ -165,7 +184,7 @@ class ChatService {
     }
   }
 
-  // POST /chat/enviar — enviar mensagem
+  // POST /chat/enviar
   static Future<Map<String, dynamic>> enviarMensagem({
     required String token,
     required String conversaId,
@@ -183,14 +202,8 @@ class ChatService {
       if (midiaUrl != null) body['midiaUrl'] = midiaUrl;
       if (usuarioId != null && usuarioId.isNotEmpty) body['usuarioId'] = usuarioId;
 
-      final response = await ApiClient.post(
-        '/chat/enviar',
-        token: token,
-        body: body,
-      );
-
+      final response = await ApiClient.post('/chat/enviar', token: token, body: body);
       loggerService.d('enviarMensagem → ${response.statusCode}');
-
       if (response.statusCode == 201 || response.statusCode == 200) {
         return {'success': true, 'data': jsonDecode(response.body)};
       }
@@ -201,21 +214,19 @@ class ChatService {
     }
   }
 
-   // POST /conversas/{id}/encerrar — encerra a conversa e conclui o diagnóstico
-  // só o cliente dono do diagnóstico pode chamar esse endpoint
+  // POST /conversas/{id}/encerrar
   static Future<Map<String, dynamic>> encerrarConversa({
     required String token,
     required String conversaId,
   }) async {
     try {
       final response = await ApiClient.post(
-        '/conversas/$conversaId/encerrar',
-        token: token,
+        '/conversas/$conversaId/encerrar', token: token,
       );
- 
       loggerService.d('encerrarConversa → ${response.statusCode}');
- 
-      if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
+      if (response.statusCode == 200 ||
+          response.statusCode == 201 ||
+          response.statusCode == 204) {
         return {'success': true};
       }
       return {'success': false, 'message': _extractError(response.body)};
@@ -225,26 +236,65 @@ class ChatService {
     }
   }
 
-  // GET /conversas/nao-lidas — contagem real de não lidas por conversa
+  // GET /conversas/nao-lidas
   static Future<Map<String, dynamic>> buscarNaoLidas({
     required String token,
   }) async {
     try {
       final response = await ApiClient.get('/conversas/nao-lidas', token: token);
-
       loggerService.d('buscarNaoLidas → ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return {
-          'success': true,
-          'data': data is List ? data : <dynamic>[],
-        };
+        return {'success': true, 'data': data is List ? data : <dynamic>[]};
       }
       return {'success': false, 'data': <dynamic>[]};
     } catch (e) {
       loggerService.e('buscarNaoLidas erro: $e');
       return {'success': false, 'data': <dynamic>[]};
+    }
+  }
+
+  // GET /conversas/disponiveis
+  static Future<Map<String, dynamic>> buscarConversasDisponiveis({
+    required String token,
+    int pagina = 1,
+    int porPagina = 20,
+  }) async {
+    try {
+      final response = await ApiClient.get(
+        '/conversas/disponiveis?pagina=$pagina&porPagina=$porPagina',
+        token: token,
+      );
+      loggerService.d('buscarConversasDisponiveis → ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final lista = data is List ? data : (data['dados'] as List? ?? []);
+        return {'success': true, 'data': lista};
+      }
+      return {'success': false, 'message': _extractError(response.body)};
+    } catch (e) {
+      loggerService.e('buscarConversasDisponiveis erro: $e');
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
+  // POST /conversas/{id}/reivindicar
+  static Future<Map<String, dynamic>> reivindicarConversa({
+    required String token,
+    required String conversaId,
+  }) async {
+    try {
+      final response = await ApiClient.post(
+        '/conversas/$conversaId/reivindicar', token: token,
+      );
+      loggerService.d('reivindicarConversa → ${response.statusCode}');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {'success': true};
+      }
+      return {'success': false, 'message': _extractError(response.body)};
+    } catch (e) {
+      loggerService.e('reivindicarConversa erro: $e');
+      return {'success': false, 'message': 'Erro de conexão: $e'};
     }
   }
 

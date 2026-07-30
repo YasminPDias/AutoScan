@@ -20,6 +20,7 @@ class UltimaMensagem {
   });
 
   factory UltimaMensagem.fromJson(Map<String, dynamic> json) {
+   
     return UltimaMensagem(
       id: json['id']?.toString() ?? '',
       conteudo: json['conteudo']?.toString() ?? '',
@@ -70,6 +71,10 @@ class ConversaModel {
   });
 
   factory ConversaModel.fromJson(Map<String, dynamic> json) {
+   print('[DEBUG ConversaModel] json keys: ${json.keys.toList()}');
+  print('[DEBUG ConversaModel] clienteNome: ${json['clienteNome']}');
+  
+
     return ConversaModel(
       id: json['id']?.toString() ?? '',
       aiDiagnosticoId: json['aiDiagnosticoId']?.toString(),
