@@ -114,11 +114,13 @@ class DiagnosticService {
   /// GET /diagnostico-ia/historico/me — histórico do usuário autenticado
   static Future<Map<String, dynamic>> buscarMeuHistorico({
     required String token,
+    int pagina = 1,
+    int porPagina = 10,
   }) async {
-    loggerService.d('Buscando histórico de diagnósticos do usuário');
+    loggerService.d('Buscando histórico de diagnósticos do usuário (página $pagina)');
 
     final response = await ApiClient.get(
-      '/diagnostico-ia/historico/me',
+      '/diagnostico-ia/historico/me?pagina=$pagina&porPagina=$porPagina',
       token: token,
     );
 
@@ -127,7 +129,15 @@ class DiagnosticService {
     if (response.statusCode == 200 || response.statusCode == 201) {
       final data = jsonDecode(response.body);
       loggerService.i('Histórico de diagnósticos carregado com sucesso');
+      
       if (data is List) return {'success': true, 'data': data};
+      
+      // backend retorna objeto paginado { dados: [...], total, pagina... }
+      if (data is Map && data.containsKey('dados')) {
+        final lista = data['dados'] as List? ?? [];
+        return {'success': true, 'data': lista, 'total': data['total']};
+      }
+      
       return {'success': true, 'data': [data]};
     } else {
       loggerService.w(

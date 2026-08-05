@@ -18,16 +18,42 @@ class _HistoryScreenState extends State<HistoryScreen> {
   String? _errorMessage;
   List<Map<String, dynamic>> _diagnosticItems = [];
 
+  final ScrollController _scrollController = ScrollController();
+  int _currentPage = 1;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  static const int _limit = 10;
+
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _loadHistory();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200 &&
+        !_isLoading &&
+        !_isLoadingMore &&
+        _hasMore) {
+      _loadMore();
+    }
   }
 
   Future<void> _loadHistory() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _currentPage = 1;
+      _hasMore = true;
     });
 
     try {
@@ -40,46 +66,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
         return;
       }
 
-      final result = await DiagnosticService.buscarMeuHistorico(token: token);
+      final result = await DiagnosticService.buscarMeuHistorico(
+        token: token,
+        pagina: _currentPage,
+        porPagina: _limit,
+      );
 
       if (!mounted) return;
 
       if (result['success'] == true) {
         final List data = result['data'] as List;
+        
+        if (data.length < _limit) {
+          _hasMore = false;
+        }
+
         setState(() {
-          _diagnosticItems = data.map((item) {
-            final dados = item['dadosParaDiagnostico'] as Map<String, dynamic>? ?? {};
-            final codigo = dados['codigoODB2'] ?? '';
-            final marca = dados['marcaVeiculo'] ?? '';
-            final modelo = dados['modeloVeiculo'] ?? '';
-            final ano = dados['anoVeiculo']?.toString() ?? '';
-            final createdAt = item['createdAt'] ?? '';
-            final status = item['status'] ?? 'PENDENTE';
-
-            DiagnosticStatus diagStatus;
-            switch (status) {
-              case 'CONCLUIDO':
-                diagStatus = DiagnosticStatus.resolved;
-                break;
-              case 'PENDENTE':
-              case 'EM_ANALISE':
-                diagStatus = DiagnosticStatus.pending;
-                break;
-              case 'INCONCLUSIVO':
-                diagStatus = DiagnosticStatus.urgent;
-                break;
-              default:
-                diagStatus = DiagnosticStatus.pending;
-            }
-
-            return {
-              'code': codigo,
-              'vehicle': '$marca $modelo $ano'.trim(),
-              'date': _formatDate(createdAt),
-              'status': diagStatus,
-              'fullData': item,
-            };
-          }).toList();
+          _diagnosticItems = data.map((item) => _parseDiagnosticItem(item)).toList();
           _isLoading = false;
         });
       } else {
@@ -95,6 +98,82 @@ class _HistoryScreenState extends State<HistoryScreen> {
         _errorMessage = 'Erro de conexão: $e';
       });
     }
+  }
+
+  Future<void> _loadMore() async {
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final token = await AuthStorage.getToken();
+      if (token == null || token.isEmpty) return;
+
+      _currentPage++;
+      final result = await DiagnosticService.buscarMeuHistorico(
+        token: token,
+        pagina: _currentPage,
+        porPagina: _limit,
+      );
+
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        final List data = result['data'] as List;
+
+        if (data.isEmpty || data.length < _limit) {
+          _hasMore = false;
+        }
+
+        setState(() {
+          _diagnosticItems.addAll(data.map((item) => _parseDiagnosticItem(item)).toList());
+          _isLoadingMore = false;
+        });
+      } else {
+        setState(() {
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingMore = false;
+      });
+    }
+  }
+
+  Map<String, dynamic> _parseDiagnosticItem(dynamic item) {
+    final dados = item['dadosParaDiagnostico'] as Map<String, dynamic>? ?? {};
+    final codigo = dados['codigoODB2'] ?? '';
+    final marca = dados['marcaVeiculo'] ?? '';
+    final modelo = dados['modeloVeiculo'] ?? '';
+    final ano = dados['anoVeiculo']?.toString() ?? '';
+    final createdAt = item['createdAt'] ?? '';
+    final status = item['status'] ?? 'PENDENTE';
+
+    DiagnosticStatus diagStatus;
+    switch (status) {
+      case 'CONCLUIDO':
+        diagStatus = DiagnosticStatus.resolved;
+        break;
+      case 'PENDENTE':
+      case 'EM_ANALISE':
+        diagStatus = DiagnosticStatus.pending;
+        break;
+      case 'INCONCLUSIVO':
+        diagStatus = DiagnosticStatus.urgent;
+        break;
+      default:
+        diagStatus = DiagnosticStatus.pending;
+    }
+
+    return {
+      'code': codigo,
+      'vehicle': '$marca $modelo $ano'.trim(),
+      'date': _formatDate(createdAt),
+      'status': diagStatus,
+      'fullData': item,
+    };
   }
 
   String _formatDate(String isoDate) {
@@ -150,6 +229,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 onRefresh: _loadHistory,
                 color: AppColors.primaryRed,
                 child: SingleChildScrollView(
+                  controller: _scrollController,
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.all(context.isDesktop ? 40 : 20),
                   child: Column(
@@ -248,7 +328,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         ),
                       ] else ...[
                         Text(
-                          '${_diagnosticItems.length} diagnóstico(s) encontrado(s)',
+                          'Listando ${_diagnosticItems.length} diagnóstico(s)',
                           style: const TextStyle(
                             fontSize: 13,
                             color: AppColors.textSecondary,
@@ -301,6 +381,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   );
                                 }).toList(),
                               ),
+                        if (_isLoadingMore)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: CircularProgressIndicator(color: AppColors.primaryRed),
+                            ),
+                          ),
                       ],
                     ],
                   ),

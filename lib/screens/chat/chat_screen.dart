@@ -58,6 +58,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _myUserName;
   String? _myRole;
   String? _token;
+  String? _clienteId;
   String _conversaStatus = '';
 
   bool get _isEncerrada =>
@@ -65,9 +66,9 @@ class _ChatScreenState extends State<ChatScreen> {
       _conversaStatus == 'FECHADA' ||
       _conversaStatus == 'CONCLUIDA';
 
-  bool get _isCliente {
-    final role = (_myRole ?? '').toUpperCase();
-    return role != 'ADMIN' && role != 'ASSISTENTE';
+  bool get _isDonoDaConversa {
+    if (_clienteId == null || _myUserId == null) return false;
+    return _clienteId == _myUserId;
   }
 
   @override
@@ -150,7 +151,10 @@ class _ChatScreenState extends State<ChatScreen> {
     );
     if (convResult['success'] == true && mounted) {
       final data = convResult['data'] as Map<String, dynamic>;
-      setState(() => _conversaStatus = data['status']?.toString() ?? '');
+      setState(() {
+        _conversaStatus = data['status']?.toString() ?? '';
+        _clienteId = data['clienteId']?.toString();
+      });
     }
 
     await _carregarMensagens(pagina: 1);
@@ -807,7 +811,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              if (_isCliente)
+              if (_isDonoDaConversa)
                 Tooltip(
                   message: 'Problema resolvido — encerrar conversa',
                   child: _isEncerrandoConversa
@@ -817,7 +821,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           child: IconButton(icon: const Icon(Icons.check_circle_outline, color: Color(0xFF388E3C)), onPressed: _encerrarConversa, tooltip: ''),
                         ),
                 ),
-              if (_isCliente) const SizedBox(width: 4),
+              if (_isDonoDaConversa) const SizedBox(width: 4),
               _isSending
                   ? const Padding(padding: EdgeInsets.all(10), child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryRed)))
                   : IconButton(icon: const Icon(Icons.send_rounded), onPressed: _enviarMensagem, color: AppColors.primaryRed, tooltip: 'Enviar'),
