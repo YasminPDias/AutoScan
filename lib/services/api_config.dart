@@ -25,10 +25,8 @@ class ApiConfig {
     return 'https://teste.autex.app.br/api'; // iOS simulator
   }
 
-
-
-  // o cliente socket.io usa esse mesmo host (ele mesmo cuida do protocolo)
-  static String get wsUrl => baseUrl;
+  // o cliente socket.io usa esse mesmo host, mas sem o sufixo /api que seria interpretado como namespace
+  static String get wsUrl => baseUrl.replaceAll('/api', '');
 
   // Console do Firebase → Configurações do projeto → Cloud Messaging →
   // Configuração da Web → Certificados Web Push → Gerar par de chaves.

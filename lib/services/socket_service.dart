@@ -34,7 +34,7 @@ class SocketService {
   void Function(Map<String, dynamic>)? onConversaAtualizada;
 
   void conectar(String token) {
-    if (_socket != null && _socket!.connected) return; // já conectado
+    if (_socket != null) return; // já inicializado (pode estar conectando, conectado ou auto-reconectando)
 
     _socket = IO.io(
       ApiConfig.wsUrl,

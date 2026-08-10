@@ -4,7 +4,6 @@ import '../../layouts/desktop_layout.dart';
 import '../../utils/responsive.dart';
 import '../../services/diagnostic_service.dart';
 import '../../services/auth_storage.dart';
-import '../../services/logger_service.dart';
 
 class DiagnosticResultScreen extends StatefulWidget {
   const DiagnosticResultScreen({super.key});
@@ -14,40 +13,73 @@ class DiagnosticResultScreen extends StatefulWidget {
 }
 
 class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
+  // ---------------------------------------------------------------------------
+  // Regex de parsing (estáticas: compiladas uma única vez)
+  // ---------------------------------------------------------------------------
+
+  /// Cabeçalho em negrito. Aceita: **Título**, **Título:**, ## **Título**
+  static final RegExp _kHeaderBold =
+      RegExp(r'^\s*#{0,6}\s*\*{1,2}\s*([^*\n]+?)\s*:?\s*\*{1,2}\s*:?\s*$');
+
+  /// Cabeçalho markdown puro: ## Título
+  static final RegExp _kHeaderHash = RegExp(r'^\s*#{1,6}\s+([^#\n]+?)\s*:?\s*$');
+
+  /// Lista numerada: "1. texto" ou "1) texto"
+  static final RegExp _kNumbered = RegExp(r'^\s*(\d+)[.)]\s+(.+)$');
+
+  /// Bullet: "* texto", "- texto", "• texto" (indentação opcional)
+  static final RegExp _kBullet = RegExp(r'^(\s*)[*\-•]\s+(.+)$');
+
+  /// Negrito inline
+  static final RegExp _kBold = RegExp(r'\*\*([^*]+)\*\*');
+
+  // ---------------------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------------------
+
   bool _isUpdating = false;
   Map<String, dynamic>? _data;
+  List<Map<String, dynamic>> _sections = const [];
+  String _diagnosticoRaw = '';
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _data ??=
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    if (_data != null) return;
+
+    _data = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    _diagnosticoRaw =
+        _data?['diagnostico']?.toString() ?? 'Sem diagnóstico disponível.';
+    _sections = _parseDiagnosticSections(_diagnosticoRaw);
   }
+
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
     final data = _data;
 
     if (data == null) {
-      return DesktopLayout(
+      return const DesktopLayout(
         currentRoute: '/diagnostic-result',
         title: '',
         showAppBar: false,
-        child: const Center(child: Text('Nenhum dado disponível.')),
+        child: Center(child: Text('Nenhum dado disponível.')),
       );
     }
 
-    final diagnostico = data['diagnostico'] ?? 'Sem diagnóstico disponível.';
-    final status = data['status'] ?? 'CONCLUIDO';
+    final diagnostico = _diagnosticoRaw;
+    final status = data['status']?.toString() ?? 'CONCLUIDO';
     final dadosVeiculo =
-        data['dadosParaDiagnostico'] as Map<String, dynamic>? ?? {};
-    final createdAt = data['createdAt'] ?? '';
-
-    final codigo = dadosVeiculo['codigoODB2'] ?? '';
-    final marca = dadosVeiculo['marcaVeiculo'] ?? '';
-    final modelo = dadosVeiculo['modeloVeiculo'] ?? '';
+        data['dadosParaDiagnostico'] as Map<String, dynamic>? ?? const {};
+    final createdAt = data['createdAt']?.toString() ?? '';
+    final codigo = dadosVeiculo['codigoODB2']?.toString() ?? '';
+    final marca = dadosVeiculo['marcaVeiculo']?.toString() ?? '';
+    final modelo = dadosVeiculo['modeloVeiculo']?.toString() ?? '';
     final ano = dadosVeiculo['anoVeiculo']?.toString() ?? '';
-    final sintomas = dadosVeiculo['sintomas'] ?? '';
+    final sintomas = dadosVeiculo['sintomas']?.toString() ?? '';
 
     return DesktopLayout(
       currentRoute: '/diagnostic-result',
@@ -114,17 +146,13 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Text(
-              'Resultado do Diagnóstico',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
+        const Text(
+          'Resultado do Diagnóstico',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
         ),
         const SizedBox(height: 32),
         Row(
@@ -184,6 +212,10 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
       ],
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Status
+  // ---------------------------------------------------------------------------
 
   Widget _buildStatusBanner(String status) {
     Color bgColor;
@@ -254,13 +286,12 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Card do diagnóstico
+  // ---------------------------------------------------------------------------
+
   Widget _buildDiagnosticCard(String diagnostico) {
-    final sections = _parseDiagnosticSections(diagnostico);
-    // DEBUG temporário — remover depois
-    loggerService.d(
-      'DIAGNÓSTICO RAW (primeiros 200 chars): ${diagnostico.substring(0, diagnostico.length.clamp(0, 200))}',
-    );
-    loggerService.d('SEÇÕES ENCONTRADAS: ${sections.length}');
+    final sections = _sections;
 
     return Card(
       child: Padding(
@@ -313,68 +344,73 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
                 ),
               )
             else
-              ...sections.map((section) => _buildDiagnosticSection(section)),
+              ...sections.map(_buildDiagnosticSection),
           ],
         ),
       ),
     );
   }
 
-  /// Detecta seções  **Título**.
-  List<Map<String, dynamic>> _parseDiagnosticSections(String text) {
-    Map<String, dynamic> _sectionStyle(String title) {
-      final t = title.toLowerCase();
-      if (t.contains('diagn')) {
-        return {
-          'icon': Icons.medical_information,
-          'color': AppColors.primaryRed,
-        };
-      } else if (t.contains('causa') || t.contains('poss')) {
-        return {'icon': Icons.search, 'color': const Color(0xFFE64A19)};
-      } else if (t.contains('recomend')) {
-        return {'icon': Icons.build, 'color': const Color(0xFF1976D2)};
-        // }
-        // else if (t.contains('risco')) {
-        //   return {'icon': Icons.warning_amber, 'color': const Color(0xFFFFA000)};
-      } else {
-        return {'icon': Icons.info_outline, 'color': const Color(0xFF7B1FA2)};
-      }
+  // ---------------------------------------------------------------------------
+  // Parser
+  // ---------------------------------------------------------------------------
+
+  static Map<String, dynamic> _sectionStyle(String title) {
+    final t = title.toLowerCase();
+
+    if (t.contains('risco') || t.contains('gravidade')) {
+      return {'icon': Icons.warning_amber, 'color': const Color(0xFFFFA000)};
     }
+    if (t.contains('diagn')) {
+      return {'icon': Icons.medical_information, 'color': AppColors.primaryRed};
+    }
+    if (t.contains('causa') || t.contains('poss')) {
+      return {'icon': Icons.search, 'color': const Color(0xFFE64A19)};
+    }
+    if (t.contains('recomend') ||
+        t.contains('procedimento') ||
+        t.contains('repar')) {
+      return {'icon': Icons.build, 'color': const Color(0xFF1976D2)};
+    }
+    return {'icon': Icons.info_outline, 'color': const Color(0xFF7B1FA2)};
+  }
 
-    // Reconhece uma linha que é APENAS **Título** (sem ':' no final)
-    final headerLine = RegExp(r'^\s*\*\*([^*:][^*]*[^*:]?)\*\*\s*$');
-
-    final lines = text.split('\n');
-    final List<Map<String, dynamic>> sections = [];
+  /// Divide o texto em seções delimitadas por cabeçalho.
+  ///
+  /// Conteúdo anterior ao primeiro cabeçalho é preservado como seção sem
+  /// título (em vez de descartado). Se nenhum cabeçalho for reconhecido,
+  /// retorna lista vazia para acionar o fallback de texto cru.
+  static List<Map<String, dynamic>> _parseDiagnosticSections(String text) {
+    final sections = <Map<String, dynamic>>[];
+    final buffer = <String>[];
     String? currentTitle;
-    Map<String, dynamic>? currentStyle;
-    final List<String> currentLines = [];
 
     void flush() {
-      if (currentTitle != null) {
-        sections.add({
-          'title': currentTitle!,
-          'content': currentLines.join('\n').trim(),
-          ...currentStyle!,
-        });
-        currentLines.clear();
-      }
+      final content = buffer.join('\n').trim();
+      buffer.clear();
+      if (currentTitle == null && content.isEmpty) return;
+      final title = currentTitle ?? '';
+      sections.add({
+        'title': title,
+        'content': content,
+        ..._sectionStyle(title),
+      });
     }
 
-    for (final line in lines) {
-      final m = headerLine.firstMatch(line);
+    for (final line in text.split('\n')) {
+      final m = _kHeaderBold.firstMatch(line) ?? _kHeaderHash.firstMatch(line);
       if (m != null) {
         flush();
         currentTitle = m.group(1)!.trim();
-        currentStyle = _sectionStyle(currentTitle!);
-      } else if (currentTitle != null) {
-        currentLines.add(line);
+      } else {
+        buffer.add(line);
       }
     }
     flush();
 
-    loggerService.d('SEÇÕES: ${sections.map((s) => s["title"]).toList()}');
-    return sections;
+    final semCabecalho =
+        sections.length == 1 && (sections.first['title'] as String).isEmpty;
+    return semCabecalho ? const [] : sections;
   }
 
   Widget _buildDiagnosticSection(Map<String, dynamic> section) {
@@ -382,6 +418,7 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
     final content = section['content'] as String;
     final icon = section['icon'] as IconData;
     final color = section['color'] as Color;
+    final isRisco = title.toLowerCase().contains('risco');
 
     return Container(
       width: double.infinity,
@@ -395,72 +432,45 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: color,
+          if (title.isNotEmpty) ...[
+            Row(
+              children: [
+                Icon(icon, color: color, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
                   ),
                 ),
-              ),
-              //  if (title == 'Nível de Risco') _buildRiskBadge(content),
-            ],
-          ),
-          const SizedBox(height: 12),
+                if (isRisco) _buildRiskBadge(content),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
           _buildMarkdownContent(content, color),
         ],
       ),
     );
   }
 
-  /// Renderiza conteúdo com listas numeradas, sub-bullets (*) e negrito (**).
+  /// Renderiza listas numeradas, bullets e negrito inline.
   Widget _buildMarkdownContent(String content, Color accentColor) {
-    final lines = content.split('\n');
-    final List<Widget> widgets = [];
+    final widgets = <Widget>[];
 
-    for (final rawLine in lines) {
+    for (final rawLine in content.split('\n')) {
       final line = rawLine.trimRight();
       if (line.trim().isEmpty) continue;
 
-      // 1. Lista numerada: "1.  texto"
-      final numberedMatch = RegExp(r'^(\d+)\.\s+(.+)$').firstMatch(line.trim());
-      if (numberedMatch != null) {
-        final number = numberedMatch.group(1)!;
-        final itemText = numberedMatch.group(2)!;
-        widgets.add(
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8, top: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$number.  ',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: accentColor,
-                    fontSize: 14,
-                  ),
-                ),
-                Expanded(child: _buildRichText(itemText, 14)),
-              ],
-            ),
-          ),
-        );
-        continue;
-      }
-
-      // 2. Sub-bullet indentado: "    *   texto"
-      final bulletMatch = RegExp(r'^(\s+)\*\s+(.+)$').firstMatch(line);
+      // 1. Bullet (indentação opcional)
+      final bulletMatch = _kBullet.firstMatch(line);
       if (bulletMatch != null) {
         final indentLen = bulletMatch.group(1)!.length;
-        final bulletText = bulletMatch.group(2)!;
-        final leftPad = indentLen <= 4 ? 16.0 : 32.0;
+        final leftPad = indentLen >= 5 ? 32.0 : 16.0;
         widgets.add(
           Padding(
             padding: EdgeInsets.only(left: leftPad, bottom: 4),
@@ -479,7 +489,7 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Expanded(child: _buildRichText(bulletText, 13)),
+                Expanded(child: _buildRichText(bulletMatch.group(2)!, 13)),
               ],
             ),
           ),
@@ -487,7 +497,32 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
         continue;
       }
 
-      // 3. Parágrafo normal
+      // 2. Lista numerada
+      final numberedMatch = _kNumbered.firstMatch(line);
+      if (numberedMatch != null) {
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8, top: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${numberedMatch.group(1)}.  ',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: accentColor,
+                    fontSize: 14,
+                  ),
+                ),
+                Expanded(child: _buildRichText(numberedMatch.group(2)!, 14)),
+              ],
+            ),
+          ),
+        );
+        continue;
+      }
+
+      // 3. Parágrafo
       widgets.add(
         Padding(
           padding: const EdgeInsets.only(bottom: 6),
@@ -502,13 +537,12 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
     );
   }
 
-  /// Converte **bold** em TextSpan negrito
+  /// Converte **bold** em TextSpan negrito.
   Widget _buildRichText(String text, double fontSize) {
-    final boldPattern = RegExp(r'\*\*([^*]+)\*\*');
-    final List<TextSpan> spans = [];
+    final spans = <TextSpan>[];
     int lastEnd = 0;
 
-    for (final match in boldPattern.allMatches(text)) {
+    for (final match in _kBold.allMatches(text)) {
       if (match.start > lastEnd) {
         spans.add(TextSpan(text: text.substring(lastEnd, match.start)));
       }
@@ -536,20 +570,31 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
     );
   }
 
+  /// Avalia apenas a primeira linha não-vazia para evitar falso positivo
+  /// causado por palavras como "alto" no texto de justificativa.
   Widget _buildRiskBadge(String content) {
-    final lower = content.toLowerCase();
+    final firstLine = content
+        .split('\n')
+        .firstWhere((l) => l.trim().isNotEmpty, orElse: () => '')
+        .replaceAll('*', '')
+        .toLowerCase();
+
     Color badgeColor;
     String label;
 
-    if (lower.contains('médio a alto') || lower.contains('medio a alto')) {
+    if (firstLine.contains('crític') || firstLine.contains('critic')) {
+      badgeColor = AppColors.statusUrgent;
+      label = 'Crítico';
+    } else if (firstLine.contains('médio a alto') ||
+        firstLine.contains('medio a alto')) {
       badgeColor = const Color(0xFFE64A19);
       label = 'Médio-Alto';
-    } else if (lower.contains('alto') ||
-        lower.contains('crítico') ||
-        lower.contains('grave')) {
+    } else if (firstLine.contains('alto') || firstLine.contains('grave')) {
       badgeColor = AppColors.statusUrgent;
       label = 'Alto';
-    } else if (lower.contains('médio') || lower.contains('moderado')) {
+    } else if (firstLine.contains('médio') ||
+        firstLine.contains('medio') ||
+        firstLine.contains('moderado')) {
       badgeColor = AppColors.statusPending;
       label = 'Médio';
     } else {
@@ -573,6 +618,10 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
       ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Dados do veículo
+  // ---------------------------------------------------------------------------
 
   Widget _buildVehicleInfoCard(
     String codigo,
@@ -655,11 +704,19 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
   String _formatDate(String isoDate) {
     try {
       final dt = DateTime.parse(isoDate);
-      return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      final d = dt.day.toString().padLeft(2, '0');
+      final m = dt.month.toString().padLeft(2, '0');
+      final h = dt.hour.toString().padLeft(2, '0');
+      final min = dt.minute.toString().padLeft(2, '0');
+      return '$d/$m/${dt.year} $h:$min';
     } catch (_) {
       return isoDate;
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Ações
+  // ---------------------------------------------------------------------------
 
   Future<void> _marcarComoConcluido(Map<String, dynamic> data) async {
     setState(() => _isUpdating = true);
@@ -678,9 +735,9 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
       }
 
       final diagnosticoId = data['id']?.toString() ?? '';
-      final diagnosticoTexto = data['diagnostico'] ?? '';
+      final diagnosticoTexto = data['diagnostico']?.toString() ?? '';
       final dadosVeiculo =
-          data['dadosParaDiagnostico'] as Map<String, dynamic>? ?? {};
+          data['dadosParaDiagnostico'] as Map<String, dynamic>? ?? const {};
       final dadosId = dadosVeiculo['id']?.toString() ?? '';
 
       if (diagnosticoId.isEmpty) {
@@ -725,6 +782,7 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
             duration: const Duration(seconds: 3),
           ),
         );
+
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
             Navigator.pushReplacementNamed(context, '/home');
@@ -733,7 +791,8 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? 'Erro ao atualizar status.'),
+            content: Text(result['message']?.toString() ??
+                'Erro ao atualizar status.'),
             backgroundColor: AppColors.statusUrgent,
           ),
         );
@@ -752,8 +811,6 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
   }
 
   Widget _buildActionButtons(BuildContext context, Map<String, dynamic> data) {
-    final diagnostico = data['diagnostico'] ?? '';
-
     return Column(
       children: [
         SizedBox(
@@ -802,7 +859,7 @@ class _DiagnosticResultScreenState extends State<DiagnosticResultScreen> {
                       '/chat',
                       arguments: {
                         'diagnosticoId': data['id']?.toString() ?? '',
-                        'diagnosticoTexto': diagnostico,
+                        'diagnosticoTexto': _diagnosticoRaw,
                       },
                     );
                   },

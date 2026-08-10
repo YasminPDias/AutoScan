@@ -5,6 +5,7 @@ import '../../utils/responsive.dart';
 import '../../services/auth_storage.dart';
 import '../../services/diagnostic_service.dart';
 import '../../services/logger_service.dart';
+import '../../widgets_defaults/feature_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -49,7 +50,6 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final res = await DiagnosticService.buscarMeusDiagnosticosAbertos(token: _token!);
       if (!mounted) return;
-
       if (res['success'] == true) {
         setState(() {
           _chamadosAbertos = (res['data'] as List).cast<dynamic>();
@@ -79,14 +79,10 @@ class _HomeScreenState extends State<HomeScreen> {
       Navigator.pushNamed(context, '/chat', arguments: {'conversaId': conversaId});
     } else if (diagnosticoId != null && diagnosticoId.isNotEmpty) {
       final diagnosticoTexto = item['diagnostico']?.toString();
-      Navigator.pushNamed(
-        context,
-        '/chat',
-        arguments: {
-          'diagnosticoId': diagnosticoId,
-          'diagnosticoTexto': diagnosticoTexto,
-        },
-      );
+      Navigator.pushNamed(context, '/chat', arguments: {
+        'diagnosticoId': diagnosticoId,
+        'diagnosticoTexto': diagnosticoTexto,
+      });
     }
   }
 
@@ -117,19 +113,9 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          color: fg,
-        ),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: fg)),
     );
   }
 
@@ -140,24 +126,14 @@ class _HomeScreenState extends State<HomeScreen> {
         Row(
           children: [
             Container(
-              width: 4,
-              height: 20,
-              decoration: BoxDecoration(
-                color: AppColors.primaryRed,
-                borderRadius: BorderRadius.circular(2),
-              ),
+              width: 4, height: 24,
+              decoration: BoxDecoration(color: AppColors.primaryRed, borderRadius: BorderRadius.circular(2)),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
             const Expanded(
               child: Text(
                 'Chamados & Conversas em Aberto',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
               ),
             ),
             IconButton(
@@ -183,55 +159,55 @@ class _HomeScreenState extends State<HomeScreen> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.border),
             ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryRed.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.check_circle_outline,
-                    color: AppColors.primaryRed,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Text(
-                        'Nenhum chamado em aberto',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.lightRed,
+                          borderRadius: BorderRadius.circular(12),
                         ),
+                        child: const Icon(Icons.check_circle_outline, color: AppColors.primaryRed, size: 26),
                       ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Precisa de suporte com um veículo? Inicie um novo diagnóstico.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Nenhum chamado em aberto no momento',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Precisa de ajuda com o seu veículo? Inicie um novo diagnóstico inteligente.',
+                              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: () => Navigator.pushNamed(context, '/diagnostic'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryRed,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pushNamed(context, '/diagnostic'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryRed,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text('Novo Diagnóstico', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    ),
                   ),
-                  child: const Text('Diagnóstico', style: TextStyle(color: Colors.white, fontSize: 12)),
-                ),
-              ],
+                ],
+              ),
             ),
           )
         else
@@ -251,87 +227,84 @@ class _HomeScreenState extends State<HomeScreen> {
 
               final tituloVeiculo = veiculo.isNotEmpty ? (ano.isNotEmpty ? '$veiculo ($ano)' : veiculo) : 'Veículo não informado';
 
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.border),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+              return Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: const BorderSide(color: AppColors.border),
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1976D2).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.directions_car,
-                        color: Color(0xFF1976D2),
-                        size: 18,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // linha superior: ícone + texto + badge
+                      Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            tituloVeiculo,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
+                          Container(
+                            width: 44, height: 44,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1976D2).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            child: const Icon(Icons.chat_bubble_outline, color: Color(0xFF1976D2), size: 24),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            codObd.isNotEmpty ? 'Código OBD: $codObd | $sintomas' : sintomas,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // título + badge com Wrap pra não quebrar
+                                Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  children: [
+                                    Text(
+                                      veiculo.isNotEmpty
+                                          ? '$veiculo${ano.isNotEmpty ? ' ($ano)' : ''}'
+                                          : 'Veículo não informado',
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    _buildStatusBadge(status),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  codObd.isNotEmpty
+                                      ? 'Código OBD: $codObd | Sintomas: $sintomas'
+                                      : 'Sintomas: $sintomas',
+                                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildStatusBadge(status),
-                        const SizedBox(height: 6),
-                        OutlinedButton.icon(
+                      const SizedBox(height: 12),
+                      // botão sempre em largura total
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
                           onPressed: () => _abrirChatDoChamado(item),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF1976D2),
-                            side: const BorderSide(color: Color(0xFF1976D2)),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1976D2),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          icon: const Icon(Icons.forum, size: 14),
-                          label: const Text('Abrir Chat', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          icon: const Icon(Icons.forum, size: 18, color: Colors.white),
+                          label: const Text('Abrir Chat', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
@@ -349,307 +322,251 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Container(
         color: AppColors.background,
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(context.isDesktop ? 32 : 16),
+          padding: EdgeInsets.all(context.isDesktop ? 32 : 20),
+          child: context.isDesktop ? _buildDesktopLayout(context) : _buildMobileLayout(context),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopLayout(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(48),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [AppColors.primaryRed, Color(0xFFB71C1C)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [BoxShadow(color: AppColors.primaryRed.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 8))],
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Hero Banner Empresarial
-              _buildHeroBanner(context),
-              const SizedBox(height: 24),
-
-              // Seção de Chamados Abertos
-              _buildChamadosAbertosSection(context),
-              const SizedBox(height: 28),
-
-              // Seção de Recursos Principais
               Row(
                 children: [
                   Container(
-                    width: 4,
-                    height: 20,
+                    width: 140, height: 140,
                     decoration: BoxDecoration(
-                      color: AppColors.primaryRed,
-                      borderRadius: BorderRadius.circular(2),
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4))],
                     ),
+                    child: const Icon(Icons.directions_car_rounded, size: 70, color: Colors.white),
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Recursos & Ações Rápidas',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                  const SizedBox(width: 32),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _welcomeTitle,
+                          style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: -0.5),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Sistema Profissional de Diagnóstico Automotivo',
+                          style: TextStyle(fontSize: 18, color: Colors.white.withValues(alpha: 0.95), fontWeight: FontWeight.w400),
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            _buildStatBadge('1000+', 'Diagnósticos'),
+                            const SizedBox(width: 24),
+                            _buildStatBadge('24/7', 'Suporte'),
+                            const SizedBox(width: 24),
+                            _buildStatBadge('IA', 'Avançada'),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              _buildQuickActionsGrid(context),
             ],
           ),
         ),
-      ),
+        const SizedBox(height: 32),
+        _buildChamadosAbertosSection(context),
+        const SizedBox(height: 40),
+        Row(
+          children: [
+            Container(width: 4, height: 24, decoration: BoxDecoration(color: AppColors.primaryRed, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(width: 12),
+            const Text('Recursos Principais', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+          ],
+        ),
+        const SizedBox(height: 28),
+        GridView.count(
+          crossAxisCount: 3,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 24,
+          crossAxisSpacing: 24,
+          childAspectRatio: 1.35,
+          children: [
+            _buildEnhancedFeatureCard(icon: Icons.analytics_outlined, title: 'Diagnóstico Inteligente', description: 'Análise completa e precisa do seu veículo', color: AppColors.primaryRed, onTap: () => Navigator.pushNamed(context, '/diagnostic')),
+            _buildEnhancedFeatureCard(icon: Icons.chat_bubble_outline, title: 'Chat com Especialista', description: 'Tire dúvidas com IA e mecânicos', color: const Color(0xFF1976D2), onTap: () => Navigator.pushNamed(context, '/history')),
+            _buildEnhancedFeatureCard(icon: Icons.description_outlined, title: 'Planos e Assinaturas', description: 'Conheça nossos planos', color: const Color(0xFF388E3C), onTap: () => Navigator.pushNamed(context, '/plans')),
+            _buildEnhancedFeatureCard(icon: Icons.history, title: 'Histórico Completo', description: 'Acesse todos os diagnósticos', color: const Color(0xFFE64A19), onTap: () => Navigator.pushNamed(context, '/history')),
+            _buildEnhancedFeatureCard(icon: Icons.support_agent, title: 'Suporte 24/7', description: 'Assistência sempre disponível', color: const Color(0xFF7B1FA2), onTap: () => Navigator.pushNamed(context, '/history')),
+            _buildEnhancedFeatureCard(icon: Icons.trending_up, title: 'Relatórios Detalhados', description: 'Análises e estatísticas', color: const Color(0xFF00796B), onTap: () => Navigator.pushNamed(context, '/dashboard')),
+            if (_userRole.toUpperCase() == 'ADMIN')
+              _buildEnhancedFeatureCard(
+                icon: Icons.manage_accounts_outlined,
+                title: 'Gestão do Sistema',
+                description: 'Painel administrativo',
+                color: const Color(0xFF7B1FA2),
+                onTap: () => Navigator.pushNamed(context, '/admin/users'),
+              ),
+          ],
+        ),
+      ],
     );
   }
 
-  Widget _buildHeroBanner(BuildContext context) {
-    final isDesktop = context.isDesktop;
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(isDesktop ? 36 : 20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primaryRed, Color(0xFFB71C1C)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+  Widget _buildMobileLayout(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+          decoration: BoxDecoration(color: AppColors.primaryRed, borderRadius: BorderRadius.circular(16)),
+          child: Column(
+            children: [
+              Container(
+                width: 80, height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 2),
+                ),
+                child: const Icon(Icons.directions_car, size: 48, color: Colors.white),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                _welcomeTitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Sistema Profissional de Diagnóstico Automotivo',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.white),
+              ),
+            ],
+          ),
         ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryRed.withOpacity(0.3),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+        const SizedBox(height: 24),
+        _buildChamadosAbertosSection(context),
+        const SizedBox(height: 24),
+        const Text('Recursos Principais', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+        const SizedBox(height: 16),
+        FeatureCard(
+          icon: Icons.analytics_outlined,
+          title: 'Diagnóstico Inteligente',
+          description: 'Análise completa e precisa do seu veículo com tecnologia avançada',
+          onTap: () => Navigator.pushNamed(context, '/diagnostic'),
+        ),
+        const SizedBox(height: 20),
+        FeatureCard(
+          icon: Icons.chat_bubble_outline,
+          title: 'Chat com Especialista',
+          description: 'Tire suas dúvidas com IA ou abra um chamado e aguarde um mecânico especializado',
+          onTap: () => Navigator.pushNamed(context, '/history'),
+        ),
+        const SizedBox(height: 20),
+        FeatureCard(
+          icon: Icons.description_outlined,
+          title: 'Planos e Assinaturas',
+          description: 'Conheça nossos planos e fique por dentro de todas as funcionalidades',
+          onTap: () => Navigator.pushNamed(context, '/plans'),
+        ),
+        if (_userRole.toUpperCase() == 'ADMIN') ...[
+          const SizedBox(height: 20),
+          FeatureCard(
+            icon: Icons.manage_accounts_outlined,
+            title: 'Gestão do Sistema',
+            description: 'Painel administrativo',
+            onTap: () => Navigator.pushNamed(context, '/admin/users'),
           ),
         ],
+      ],
+    );
+  }
+
+  Widget _buildStatBadge(String value, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withOpacity(0.3)),
-                ),
-                child: const Icon(
-                  Icons.directions_car,
-                  size: 28,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _welcomeTitle,
-                      style: TextStyle(
-                        fontSize: isDesktop ? 26 : 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'AutoScan • Sistema Profissional de Diagnóstico Automotivo',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withOpacity(0.95),
-                        fontWeight: FontWeight.w400,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Wrap(
-            spacing: 12,
-            runSpacing: 8,
-            children: [
-              _buildFeatureChip(Icons.memory, 'Diagnóstico IA'),
-              _buildFeatureChip(Icons.speed, 'Leitura OBD2'),
-              _buildFeatureChip(Icons.support_agent, 'Suporte Especializado'),
-            ],
-          ),
+          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+          Text(label, style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.9))),
         ],
       ),
     );
   }
 
-  Widget _buildFeatureChip(IconData icon, String label) {
+  Widget _buildEnhancedFeatureCard({
+    required IconData icon,
+    required String title,
+    required String description,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.18),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.3)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: Colors.white),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w500),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActionsGrid(BuildContext context) {
-    final isDesktop = context.isDesktop;
-    final crossCount = isDesktop ? 3 : 2;
-
-    final actions = [
-      _ActionCardData(
-        icon: Icons.analytics_outlined,
-        title: 'Novo Diagnóstico',
-        description: 'Análise inteligente via OBD2',
-        color: AppColors.primaryRed,
-        route: '/diagnostic',
-      ),
-      _ActionCardData(
-        icon: Icons.chat_bubble_outline,
-        title: 'Atendimento & Suporte',
-        description: 'Conversar com IA ou Especialista',
-        color: const Color(0xFF1976D2),
-        route: '/history',
-      ),
-      _ActionCardData(
-        icon: Icons.history,
-        title: 'Histórico',
-        description: 'Ver diagnósticos anteriores',
-        color: const Color(0xFFE64A19),
-        route: '/history',
-      ),
-      _ActionCardData(
-        icon: Icons.description_outlined,
-        title: 'Planos & Assinaturas',
-        description: 'Gerenciar seu plano de uso',
-        color: const Color(0xFF388E3C),
-        route: '/plans',
-      ),
-      if (_userRole.toUpperCase() == 'ADMIN')
-        _ActionCardData(
-          icon: Icons.manage_accounts_outlined,
-          title: 'Gestão do Sistema',
-          description: 'Painel administrativo',
-          color: const Color(0xFF7B1FA2),
-          route: '/admin/users',
-        ),
-      _ActionCardData(
-        icon: Icons.person_outline,
-        title: 'Meu Perfil',
-        description: 'Dados da conta e dados cadastrais',
-        color: const Color(0xFF00796B),
-        route: '/profile',
-      ),
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossCount,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: isDesktop ? 2.8 : 1.9,
-      ),
-      itemCount: actions.length,
-      itemBuilder: (context, index) {
-        final item = actions[index];
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => Navigator.pushNamed(context, item.route),
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: item.color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(item.icon, size: 22, color: item.color),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            item.title,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            item.description,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Icon(
-                      Icons.chevron_right,
-                      size: 20,
-                      color: AppColors.textLight,
-                    ),
-                  ],
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 42, height: 42,
+                  decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                  child: Icon(icon, size: 24, color: color),
                 ),
-              ),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 2),
+                      Text(description, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.15), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
-}
-
-class _ActionCardData {
-  final IconData icon;
-  final String title;
-  final String description;
-  final Color color;
-  final String route;
-
-  const _ActionCardData({
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.color,
-    required this.route,
-  });
 }

@@ -6,13 +6,13 @@ import 'logger_service.dart';
 ///
 /// Reaproveita a conexão Socket.io compartilhada (SocketService) em vez de
 /// abrir uma conexão própria — só entra/sai da sala da conversa específica.
-/// Mantém a mesma API pública de antes (start/stop/isWsConnected), então
-/// quem já chama esse serviço não precisa mudar nada.
 ///
-/// Estratégia dual, igual antes:
+/// Estratégia dual:
 ///   1. Entra na sala via Socket.io compartilhado.
-///   2. Se não conectar (ou cair), polling HTTP de 5s mantém atualizado.
-///   3. Quando o WS confirma conexão, o polling é pausado.
+///   2. Se o WS não estiver conectado ainda, polling HTTP de 5s mantém
+///      atualizado ATÉ o WS conectar.
+///   3. Quando o WS confirma conexão, o polling é cancelado imediatamente.
+///   4. Se o WS cair durante o uso, o polling retoma como fallback.
 class ChatRealtimeService {
   String? _conversaId;
   Timer? _pollingTimer;
@@ -24,15 +24,6 @@ class ChatRealtimeService {
 
   bool get isWsConnected => _wsConnected;
 
-  /// Inicia o serviço para a [conversaId] informada.
-  ///
-  /// - [token]: JWT do usuário (usado só se a conexão compartilhada ainda
-  ///   não existir — se já conectada, é reaproveitada como está).
-  /// - [onFetch]: função que busca a lista de mensagens via HTTP.
-  /// - [onUpdate]: callback chamado com a lista atualizada a cada poll.
-  /// - [onWsMessage]: callback opcional para mensagens recebidas via WS.
-  /// - [onMensagensLidas]: callback opcional, chamado com o id de quem leu,
-  ///   toda vez que o outro participante visualiza as mensagens dessa conversa.
   Future<void> start({
     required String token,
     required String conversaId,
@@ -45,7 +36,7 @@ class ChatRealtimeService {
     _onWsMessageCallback = onWsMessage;
     _onMensagensLidasCallback = onMensagensLidas;
 
-   socketService.conectar(token);
+    socketService.conectar(token);
     final socket = socketService.socket;
 
     if (socket == null) {
@@ -55,11 +46,17 @@ class ChatRealtimeService {
     }
 
     socket.emit('entrarChat', conversaId);
-    loggerService.d('[DEBUG] socket connected: ${socket?.connected}, emitindo entrarChat: $conversaId');
+    loggerService.d('[ChatRealtime] emitindo entrarChat: $conversaId, socket conectado: ${socket.connected}');
 
     _wsConnected = socket.connected;
+
     if (_wsConnected) {
-      loggerService.i('Entrou na sala da conversa $conversaId (WS já conectado)');
+      // WS já conectado — não precisa de polling
+      loggerService.i('Entrou na sala $conversaId (WS já conectado)');
+    } else {
+      // WS ainda conectando — polling como fallback até conectar
+      loggerService.w('WS ainda conectando — polling ativo como fallback');
+      _startPolling(onFetch, onUpdate);
     }
 
     _novaMensagemListener = (data) => _handleNovaMensagem(data);
@@ -70,30 +67,24 @@ class ChatRealtimeService {
 
     socket.on('connect', (_) {
       _wsConnected = true;
-      _pollingTimer?.cancel();
+      _pollingTimer?.cancel(); // WS conectou — para o polling imediatamente
       loggerService.i('WebSocket conectado (conversa $conversaId)');
-      // reenvia entrarChat: se a conexão caiu e reconectou, a sala precisa
-      // ser reafirmada (socket.io não lembra salas entre reconexões) — isso
-      // também refaz o "catch up" de mensagens lidas no backend
+      // reenvia entrarChat: socket.io não lembra salas entre reconexões
       socket.emit('entrarChat', conversaId);
     });
 
     socket.on('disconnect', (_) {
       _wsConnected = false;
+      // WS caiu — retoma polling como fallback
+      loggerService.w('WebSocket desconectado — polling retomado');
       _startPolling(onFetch, onUpdate);
     });
-
-    _startPolling(onFetch, onUpdate);
   }
 
   void _handleNovaMensagem(dynamic data) {
     if (data is! Map) return;
     final mensagem = Map<String, dynamic>.from(data);
 
-    // TODO: confirma o campo real no MensagemRespostaDTO — chutei os dois
-    // formatos mais prováveis (nested ou flat). Necessário porque a conexão
-    // agora é compartilhada: sem esse filtro, uma 2ª conversa aberta ao
-    // mesmo tempo receberia mensagens uma da outra.
     final conversaDaMensagem =
         mensagem['conversaId'] ?? mensagem['conversa']?['id'];
     if (conversaDaMensagem != null && conversaDaMensagem != _conversaId) {
@@ -119,6 +110,7 @@ class ChatRealtimeService {
     _pollingTimer?.cancel();
     _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
       if (_wsConnected) {
+        // WS voltou — cancela o polling
         _pollingTimer?.cancel();
         return;
       }

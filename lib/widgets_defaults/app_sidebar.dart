@@ -229,7 +229,7 @@ class _AppSidebarState extends State<AppSidebar> {
                       badge: ChatReadTracker.totalUnread,
                     ),
                   ),
-                if (_isEmpresaAdmin)
+                 if (_userRole.toUpperCase() == 'ADMIN_EMPRESA')
                   _buildNavItem(
                     context,
                     icon: Icons.business_outlined,
