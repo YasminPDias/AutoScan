@@ -204,13 +204,6 @@ class _AppSidebarState extends State<AppSidebar> {
                 ),
                 _buildNavItem(
                   context,
-                  icon: Icons.dashboard_outlined,
-                  activeIcon: Icons.dashboard,
-                  label: 'Dashboard',
-                  route: '/dashboard',
-                ),
-                _buildNavItem(
-                  context,
                   icon: Icons.analytics_outlined,
                   activeIcon: Icons.analytics,
                   label: 'Diagnóstico',
@@ -249,7 +242,7 @@ class _AppSidebarState extends State<AppSidebar> {
                     context,
                     icon: Icons.manage_accounts_outlined,
                     activeIcon: Icons.manage_accounts,
-                    label: 'Gestão de Usuários',
+                    label: 'Gestão do Sistema',
                     route: '/admin/users',
                   ),
                 _buildNavItem(

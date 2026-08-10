@@ -259,6 +259,71 @@ class UserService {
     }
   }
 
+  /// GET /usuario/clientes — Buscar todos os usuários com função CLIENTE (ADMIN)
+  static Future<Map<String, dynamic>> buscarClientes({
+    required String token,
+  }) async {
+    try {
+      loggerService.d('UserService.buscarClientes — Solicitando lista de clientes');
+      final response = await ApiClient.get('/usuario/clientes', token: token);
+
+      loggerService.d('UserService.buscarClientes → Status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {
+          'success': true,
+          'data': data is List ? data : [data],
+        };
+      }
+      // Fallback para filtrar buscarUsuarios caso a rota específica falhe
+      final fallback = await buscarUsuarios(token: token);
+      if (fallback['success'] == true) {
+        final list = (fallback['data'] as List)
+            .where((u) => u['funcao']?.toString().toUpperCase() == 'CLIENTE')
+            .toList();
+        return {'success': true, 'data': list};
+      }
+      return {'success': false, 'message': _extractError(response.body)};
+    } catch (e) {
+      loggerService.e('UserService.buscarClientes erro: $e');
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
+  /// GET /usuario/admin-assistentes — Buscar usuários ADMIN e ASSISTENTE (ADMIN)
+  static Future<Map<String, dynamic>> buscarAdminAssistentes({
+    required String token,
+  }) async {
+    try {
+      loggerService.d('UserService.buscarAdminAssistentes — Solicitando lista de admins e assistentes');
+      final response = await ApiClient.get('/usuario/admin-assistentes', token: token);
+
+      loggerService.d('UserService.buscarAdminAssistentes → Status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {
+          'success': true,
+          'data': data is List ? data : [data],
+        };
+      }
+      // Fallback para filtrar buscarUsuarios caso a rota específica falhe
+      final fallback = await buscarUsuarios(token: token);
+      if (fallback['success'] == true) {
+        final list = (fallback['data'] as List).where((u) {
+          final funcao = u['funcao']?.toString().toUpperCase() ?? '';
+          return funcao == 'ADMIN' || funcao == 'ASSISTENTE';
+        }).toList();
+        return {'success': true, 'data': list};
+      }
+      return {'success': false, 'message': _extractError(response.body)};
+    } catch (e) {
+      loggerService.e('UserService.buscarAdminAssistentes erro: $e');
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
   static String _extractError(String body) {
     try {
       final json = jsonDecode(body);

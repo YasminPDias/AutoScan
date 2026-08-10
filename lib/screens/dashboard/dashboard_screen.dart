@@ -9,7 +9,8 @@ import '../../services/chat_service.dart';
 import '../../services/dashboard_service.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final bool isEmbedded;
+  const DashboardScreen({super.key, this.isEmbedded = false});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -29,6 +30,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Listas
   List<Map<String, dynamic>> _casosAbertos = [];
   Map<String, int> _porDia = {};
+  bool _mostrarTodosCasos = false;
 
   @override
   void initState() {
@@ -157,7 +159,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _resolvidos = resolvidos;
         _emAberto = emAberto;
         _conversasAbertas = conversasAbertas;
-        _casosAbertos = casosAbertos.take(5).toList();
+        _casosAbertos = casosAbertos;
         _porDia = porDia;
         _isLoading = false;
       });
@@ -191,43 +193,71 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  void _abrirChatDoCaso(Map<String, dynamic> item) {
+    final diagnosticoId = item['id']?.toString() ?? item['_id']?.toString();
+    final conversa = item['conversa'] as Map<String, dynamic>?;
+    final conversaId = conversa?['id']?.toString() ?? conversa?['_id']?.toString();
+
+    if (conversaId != null && conversaId.isNotEmpty) {
+      Navigator.pushNamed(context, '/chat', arguments: {'conversaId': conversaId});
+    } else if (diagnosticoId != null && diagnosticoId.isNotEmpty) {
+      final diagnosticoTexto = item['diagnostico']?.toString() ?? item['resultadoIA']?.toString();
+      Navigator.pushNamed(
+        context,
+        '/chat',
+        arguments: {
+          'diagnosticoId': diagnosticoId,
+          'diagnosticoTexto': diagnosticoTexto,
+        },
+      );
+    } else {
+      Navigator.pushNamed(context, '/chat');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bodyContent = Container(
+      color: AppColors.background,
+      child: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primaryRed),
+            )
+          : RefreshIndicator(
+              onRefresh: _carregar,
+              color: AppColors.primaryRed,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.all(context.isDesktop ? 40 : 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle('Visão Geral'),
+                    const SizedBox(height: 16),
+                    _buildStatGrid(context),
+                    const SizedBox(height: 32),
+                    _buildSectionTitle('Casos em Aberto'),
+                    const SizedBox(height: 16),
+                    _buildCasosAbertos(context),
+                    const SizedBox(height: 32),
+                    _buildSectionTitle('Diagnósticos — Últimos 7 Dias'),
+                    const SizedBox(height: 16),
+                    _buildBarChart(),
+                  ],
+                ),
+              ),
+            ),
+    );
+
+    if (widget.isEmbedded) {
+      return bodyContent;
+    }
+
     return DesktopLayout(
       currentRoute: '/dashboard',
       title: 'Dashboard',
       showAppBar: !context.isDesktop,
-      child: Container(
-        color: AppColors.background,
-        child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: AppColors.primaryRed),
-              )
-            : RefreshIndicator(
-                onRefresh: _carregar,
-                color: AppColors.primaryRed,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.all(context.isDesktop ? 40 : 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildSectionTitle('Visão Geral'),
-                      const SizedBox(height: 16),
-                      _buildStatGrid(context),
-                      const SizedBox(height: 32),
-                      _buildSectionTitle('Casos em Aberto'),
-                      const SizedBox(height: 16),
-                      _buildCasosAbertos(context),
-                      const SizedBox(height: 32),
-                      _buildSectionTitle('Diagnósticos — Últimos 7 Dias'),
-                      const SizedBox(height: 16),
-                      _buildBarChart(),
-                    ],
-                  ),
-                ),
-              ),
-      ),
+      child: bodyContent,
     );
   }
 
@@ -297,16 +327,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
     ];
 
-    final crossCount = context.isDesktop ? 4 : 2;
+    final crossCount = context.isDesktop ? 5 : 2;
 
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossCount,
-        mainAxisSpacing: context.isDesktop ? 20 : 12,
-        crossAxisSpacing: context.isDesktop ? 20 : 12,
-        childAspectRatio: context.isDesktop ? 1.6 : 1.3,
+        mainAxisSpacing: context.isDesktop ? 12 : 12,
+        crossAxisSpacing: context.isDesktop ? 12 : 12,
+        childAspectRatio: context.isDesktop ? 1.35 : 1.3,
       ),
       itemCount: cards.length,
       itemBuilder: (_, i) => _buildStatCard(cards[i]),
@@ -315,7 +345,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildStatCard(_StatData data) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(context.isDesktop ? 12 : 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -333,12 +363,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: data.color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(data.icon, size: 20, color: data.color),
+            child: Icon(data.icon, size: 18, color: data.color),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -346,17 +376,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Text(
                 data.value,
                 style: TextStyle(
-                  fontSize: 28,
+                  fontSize: context.isDesktop ? 22 : 28,
                   fontWeight: FontWeight.bold,
                   color: data.color,
                 ),
               ),
               Text(
                 data.label,
-                style: const TextStyle(
-                  fontSize: 12,
+                style: TextStyle(
+                  fontSize: context.isDesktop ? 11 : 12,
                   color: AppColors.textSecondary,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -386,50 +418,81 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
+    const int limite = 4;
+    final bool temMais = _casosAbertos.length > limite;
+    final listaExibicao = (_mostrarTodosCasos || !temMais)
+        ? _casosAbertos
+        : _casosAbertos.take(limite).toList();
+
     return Column(
-      children: _casosAbertos.map((item) {
-        final dados = item['dadosParaDiagnostico'] as Map<String, dynamic>? ?? {};
-        final codigo = dados['codigoODB2']?.toString() ?? '';
-        final marca = dados['marcaVeiculo']?.toString() ?? '';
-        final modelo = dados['modeloVeiculo']?.toString() ?? '';
-        final ano = dados['anoVeiculo']?.toString() ?? '';
-        final createdAt = item['createdAt']?.toString() ?? '';
-        final status = item['status']?.toString() ?? 'PENDENTE';
-        final usuario = item['usuario'] as Map<String, dynamic>?;
-        final nomeUsuario = usuario?['nome']?.toString() ?? '';
+      children: [
+        ...listaExibicao.map((item) {
+          final dados = item['dadosParaDiagnostico'] as Map<String, dynamic>? ?? {};
+          final codigo = dados['codigoODB2']?.toString() ?? '';
+          final marca = dados['marcaVeiculo']?.toString() ?? '';
+          final modelo = dados['modeloVeiculo']?.toString() ?? '';
+          final ano = dados['anoVeiculo']?.toString() ?? '';
+          final createdAt = item['createdAt']?.toString() ?? '';
+          final status = item['status']?.toString() ?? 'PENDENTE';
+          final usuario = item['usuario'] as Map<String, dynamic>?;
+          final nomeUsuario = usuario?['nome']?.toString() ?? '';
 
-        DiagnosticStatus diagStatus;
-        switch (status) {
-          case 'CONCLUIDO':
-            diagStatus = DiagnosticStatus.resolved;
-            break;
-          case 'INCONCLUSIVO':
-            diagStatus = DiagnosticStatus.urgent;
-            break;
-          default:
-            diagStatus = DiagnosticStatus.pending;
-        }
+          DiagnosticStatus diagStatus;
+          switch (status) {
+            case 'CONCLUIDO':
+              diagStatus = DiagnosticStatus.resolved;
+              break;
+            case 'INCONCLUSIVO':
+              diagStatus = DiagnosticStatus.urgent;
+              break;
+            default:
+              diagStatus = DiagnosticStatus.pending;
+          }
 
-        final vehicleLabel = [marca, modelo, ano].where((s) => s.isNotEmpty).join(' ');
-        final displayVehicle = nomeUsuario.isNotEmpty
-            ? '$vehicleLabel\nCliente: $nomeUsuario'
-            : vehicleLabel;
+          final vehicleLabel = [marca, modelo, ano].where((s) => s.isNotEmpty).join(' ');
+          final displayVehicle = nomeUsuario.isNotEmpty
+              ? '$vehicleLabel\nCliente: $nomeUsuario'
+              : vehicleLabel;
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: DiagnosticItem(
-            code: codigo.isNotEmpty ? 'Código: $codigo' : 'Sem código',
-            vehicle: displayVehicle,
-            date: _formatDate(createdAt),
-            status: diagStatus,
-            onTap: () => Navigator.pushNamed(
-              context,
-              '/diagnostic-result',
-              arguments: item,
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: DiagnosticItem(
+              code: codigo.isNotEmpty ? 'Código: $codigo' : 'Sem código',
+              vehicle: displayVehicle,
+              date: _formatDate(createdAt),
+              status: diagStatus,
+              onTap: () => _abrirChatDoCaso(item),
+            ),
+          );
+        }).toList(),
+        if (temMais)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Center(
+              child: TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _mostrarTodosCasos = !_mostrarTodosCasos;
+                  });
+                },
+                icon: Icon(
+                  _mostrarTodosCasos ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  color: AppColors.primaryRed,
+                ),
+                label: Text(
+                  _mostrarTodosCasos
+                      ? 'Ver Menos'
+                      : 'Ver Mais (${_casosAbertos.length - limite} restante${(_casosAbertos.length - limite) > 1 ? 's' : ''})',
+                  style: const TextStyle(
+                    color: AppColors.primaryRed,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
             ),
           ),
-        );
-      }).toList(),
+      ],
     );
   }
 

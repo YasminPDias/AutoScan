@@ -6,11 +6,26 @@ class ApiConfig {
   // Dispositivo físico (Android ou iOS): nem isso funciona — troca manualmente
   // pelo IP da sua máquina na rede local (ex: 192.168.0.x), ou pelo domínio
   // real quando for testar contra a VPS/produção.
+  
+  // static String get baseUrl {
+  //   if (kIsWeb) return 'https://apiautoscan.duckdns.org';
+  //   if (Platform.isAndroid) return 'https://apiautoscan.duckdns.org';
+  //   return 'https://apiautoscan.duckdns.org'; // iOS simulator
+  // }
+
+  // static String get baseUrl {
+  //   if (kIsWeb) return 'http://187.127.27.216:3001';
+  //   if (Platform.isAndroid) return 'http://187.127.27.216:3001';
+  //   return 'http://187.127.27.216:3001'; // iOS simulator
+  // }
+
   static String get baseUrl {
-    if (kIsWeb) return 'https://apiautoscan.duckdns.org';
-    if (Platform.isAndroid) return 'https://apiautoscan.duckdns.org';
-    return 'https://apiautoscan.duckdns.org'; // iOS simulator
+    if (kIsWeb) return 'https://teste.autex.app.br/api';
+    if (Platform.isAndroid) return 'https://teste.autex.app.br/api';
+    return 'https://teste.autex.app.br/api'; // iOS simulator
   }
+
+
 
   // o cliente socket.io usa esse mesmo host (ele mesmo cuida do protocolo)
   static String get wsUrl => baseUrl;

@@ -18,6 +18,7 @@ import '../../services/websocket_service.dart';
 import '../../services/web_audio_recorder.dart';
 import '../../services/chat_read_tracker.dart';
 import '../../services/api_config.dart';
+import '../../services/atendimento_service.dart';
 import '../../models/mensagem_model.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -42,6 +43,8 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isRecordingAudio = false;
   bool _isUploadingAudio = false;
   bool _isEncerrandoConversa = false;
+  int _atendentesOnlineCount = 0;
+  bool _checkedAtendentes = false;
   Timer? _recordingTimer;
   int _recordingSeconds = 0;
   String? _conversaId;
@@ -131,6 +134,14 @@ class _ChatScreenState extends State<ChatScreen> {
       final data = convResult['data'] as Map<String, dynamic>;
       setState(() {
         _conversaStatus = data['status']?.toString() ?? '';
+      });
+    }
+
+    final atResult = await AtendimentoService.listarAtendentesOnline(token: _token!);
+    if (atResult['success'] == true && mounted) {
+      setState(() {
+        _atendentesOnlineCount = atResult['total'] as int? ?? 0;
+        _checkedAtendentes = true;
       });
     }
 
@@ -744,7 +755,51 @@ class _ChatScreenState extends State<ChatScreen> {
         appBar: context.isDesktop
             ? null
             : AppBar(
-                title: const Text('Chat'),
+                title: Row(
+                  children: [
+                    const Text('Chat'),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _atendentesOnlineCount > 0
+                            ? const Color(0xFFE8F5E9)
+                            : const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _atendentesOnlineCount > 0
+                              ? const Color(0xFF4CAF50)
+                              : const Color(0xFFBDBDBD),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.circle,
+                            size: 8,
+                            color: _atendentesOnlineCount > 0
+                                ? const Color(0xFF4CAF50)
+                                : const Color(0xFF9E9E9E),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _atendentesOnlineCount > 0
+                                ? '$_atendentesOnlineCount Atendente${_atendentesOnlineCount > 1 ? 's' : ''} Online'
+                                : 'IA Pronta',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: _atendentesOnlineCount > 0
+                                  ? const Color(0xFF2E7D32)
+                                  : const Color(0xFF616161),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back),
                   onPressed: () {

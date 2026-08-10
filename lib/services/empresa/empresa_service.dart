@@ -88,6 +88,26 @@ class EmpresaService {
     }
   }
 
+  /// GET /empresa — [ADMIN] Lista todas as empresas cadastradas no sistema
+  static Future<Map<String, dynamic>> listarTodas({
+    required String token,
+  }) async {
+    try {
+      final response = await ApiClient.get('/empresa', token: token);
+
+      loggerService.d('listarTodasEmpresas → ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {'success': true, 'data': data is List ? data : [data]};
+      }
+      return {'success': false, 'message': _extractError(response.body)};
+    } catch (e) {
+      loggerService.e('listarTodasEmpresas erro: $e');
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
+
   static Future<Map<String, dynamic>> listarMembros({
     required String token,
     required String empresaId,
@@ -161,6 +181,32 @@ class EmpresaService {
     } catch (e) {
       loggerService.e('removerFuncionario erro: $e');
       return false;
+    }
+  }
+
+  /// PATCH /empresa/{empresaId}/funcionarios/{funcionarioId}/papel
+  static Future<Map<String, dynamic>> alterarPapelFuncionario({
+    required String token,
+    required String empresaId,
+    required String funcionarioId,
+    required String novoPapel,
+  }) async {
+    try {
+      final response = await ApiClient.patch(
+        '/empresa/$empresaId/funcionarios/$funcionarioId/papel',
+        token: token,
+        body: {'papel': novoPapel},
+      );
+
+      loggerService.d('alterarPapelFuncionario → ${response.statusCode}');
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return {'success': true};
+      }
+      return {'success': false, 'message': _extractError(response.body)};
+    } catch (e) {
+      loggerService.e('alterarPapelFuncionario erro: $e');
+      return {'success': false, 'message': 'Erro de conexão: $e'};
     }
   }
 

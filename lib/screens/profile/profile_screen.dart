@@ -9,6 +9,7 @@ import '../../services/auth_storage.dart';
 import '../../services/auth_service.dart';
 import '../../services/diagnostic_service.dart';
 import '../../services/api_config.dart';
+import '../../services/push_service.dart';
 import '../../widgets_defaults/network_avatar_image.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -29,6 +30,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Uint8List? _profilePhotoBytes;
   String? _profilePhotoUrl;
   bool _photoLoadFailed = false;
+  bool _notificationsEnabled = false;
 
   String _formatRole(String role) {
     final normalized = role.trim().toUpperCase();
@@ -110,8 +112,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final modelo = (dados['modeloVeiculo'] ?? '').toString();
       final ano = (dados['anoVeiculo'] ?? '').toString();
       final createdAt = (map['createdAt'] ?? '').toString();
+      final conversa = map['conversa'] as Map<String, dynamic>?;
 
       return {
+        'id': map['id']?.toString() ?? map['_id']?.toString(),
+        'conversaId': conversa?['id']?.toString() ?? conversa?['_id']?.toString(),
+        'rawMap': map,
         'code': codigo.isNotEmpty ? 'Código: $codigo' : 'Código: -',
         'vehicle': '$marca $modelo $ano'.trim().isEmpty
             ? 'Veículo não informado'
@@ -126,6 +132,67 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _totalDiagnostics = data.length.toString();
       _recentDiagnostics = recent;
     });
+  }
+
+  void _abrirChatDoItem(Map<String, dynamic> item) {
+    final conversaId = item['conversaId'] as String?;
+    final diagId = item['id'] as String?;
+    final rawMap = item['rawMap'] as Map<String, dynamic>?;
+
+    if (conversaId != null && conversaId.isNotEmpty) {
+      Navigator.pushNamed(context, '/chat', arguments: {'conversaId': conversaId});
+    } else if (diagId != null && diagId.isNotEmpty) {
+      final diagText = rawMap?['diagnostico']?.toString() ?? rawMap?['resultadoIA']?.toString();
+      Navigator.pushNamed(
+        context,
+        '/chat',
+        arguments: {
+          'diagnosticoId': diagId,
+          'diagnosticoTexto': diagText,
+        },
+      );
+    } else {
+      Navigator.pushNamed(context, '/chat');
+    }
+  }
+
+  Future<void> _alternarNotificacoes(bool enabled) async {
+    if (enabled) {
+      final granted = await pushService.solicitarPermissao();
+      if (!mounted) return;
+      setState(() {
+        _notificationsEnabled = granted;
+      });
+      if (granted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Notificações ativadas com sucesso!'),
+            backgroundColor: Color(0xFF2E7D32),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Permissão de notificação negada no navegador/dispositivo.'),
+            backgroundColor: AppColors.primaryRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } else {
+      await pushService.desregistrar();
+      if (!mounted) return;
+      setState(() {
+        _notificationsEnabled = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Notificações desativadas.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Uint8List? _decodePhotoBytes(String rawPhoto) {
@@ -192,6 +259,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final role = await AuthStorage.getUserRole();
     final phone = await AuthStorage.getUserPhone();
     final memberSince = await AuthStorage.getUserMemberSince();
+    final notifEnabled = await pushService.checarPermissao();
 
     Uint8List? photoBytes;
     String? photoUrl;
@@ -211,6 +279,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _profilePhotoBytes = photoBytes;
         _profilePhotoUrl = photoUrl;
         _photoLoadFailed = false;
+        _notificationsEnabled = notifEnabled;
       });
     }
 
@@ -436,6 +505,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       vehicle: item['vehicle'] as String,
                       date: item['date'] as String,
                       status: item['status'] as DiagnosticStatus,
+                      onTap: () => _abrirChatDoItem(item),
                     ),
                   ),
                 const SizedBox(height: 32),
@@ -452,8 +522,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   icon: Icons.notifications,
                   title: 'Notificações',
                   trailing: Switch(
-                    value: true,
-                    onChanged: (value) {},
+                    value: _notificationsEnabled,
+                    onChanged: _alternarNotificacoes,
                     activeColor: AppColors.primaryRed,
                   ),
                 ),
@@ -633,6 +703,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       vehicle: item['vehicle'] as String,
                       date: item['date'] as String,
                       status: item['status'] as DiagnosticStatus,
+                      onTap: () => _abrirChatDoItem(item),
                     ),
                   ),
                 const SizedBox(height: 24),
@@ -649,8 +720,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   icon: Icons.notifications,
                   title: 'Notificações',
                   trailing: Switch(
-                    value: true,
-                    onChanged: (value) {},
+                    value: _notificationsEnabled,
+                    onChanged: _alternarNotificacoes,
                     activeColor: AppColors.primaryRed,
                   ),
                 ),

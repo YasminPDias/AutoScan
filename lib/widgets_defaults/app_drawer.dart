@@ -5,6 +5,7 @@ import '../theme/app_colors.dart';
 import '../services/auth_storage.dart';
 import '../services/auth_service.dart';
 import '../services/api_config.dart';
+import '../services/chat_read_tracker.dart';
 import 'network_avatar_image.dart';
 
 class AppDrawer extends StatefulWidget {
@@ -82,7 +83,7 @@ class _AppDrawerState extends State<AppDrawer> {
   Widget _buildAvatar() {
     if (_profilePhotoBytes != null) {
       return CircleAvatar(
-        radius: 40,
+        radius: 22,
         backgroundImage: MemoryImage(_profilePhotoBytes!),
       );
     }
@@ -91,18 +92,18 @@ class _AppDrawerState extends State<AppDrawer> {
         _profilePhotoUrl!.isNotEmpty) {
       return ClipOval(
         child: SizedBox(
-          width: 80,
-          height: 80,
+          width: 44,
+          height: 44,
           child: NetworkAvatarImage(
             imageUrl: _profilePhotoUrl!,
             fit: BoxFit.cover,
             fallback: Container(
-              color: Colors.white,
+              color: AppColors.primaryRed,
               alignment: Alignment.center,
               child: const Icon(
                 Icons.person,
-                size: 48,
-                color: AppColors.primaryRed,
+                size: 24,
+                color: Colors.white,
               ),
             ),
           ),
@@ -110,9 +111,9 @@ class _AppDrawerState extends State<AppDrawer> {
       );
     }
     return const CircleAvatar(
-      radius: 40,
-      backgroundColor: Colors.white,
-      child: Icon(Icons.person, size: 48, color: AppColors.primaryRed),
+      radius: 22,
+      backgroundColor: AppColors.primaryRed,
+      child: Icon(Icons.person, size: 24, color: Colors.white),
     );
   }
 
@@ -157,47 +158,61 @@ class _AppDrawerState extends State<AppDrawer> {
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
-            decoration: const BoxDecoration(color: AppColors.primaryRed),
+            padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.primaryRed, Color(0xFFB71C1C)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.menu, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
+                    Image.asset(
+                      'lib/assets/Logo Autex.png',
+                      width: 110,
+                      fit: BoxFit.contain,
                     ),
                     IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.white),
-                      onPressed: () {},
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                Center(child: _buildAvatar()),
-                const SizedBox(height: 16),
-                Center(
-                  child: Text(
-                    _userName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                Row(
+                  children: [
+                    _buildAvatar(),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _userName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _userEmail,
+                            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Center(
-                  child: Text(
-                    _userEmail,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -226,14 +241,6 @@ class _AppDrawerState extends State<AppDrawer> {
                     Navigator.pushReplacementNamed(context, '/profile');
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.dashboard),
-                  title: const Text('Painel Administrativo'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.pushReplacementNamed(context, '/dashboard');
-                  },
-                ),
                 if (_isEmpresaAdmin)
                   ListTile(
                     leading: const Icon(Icons.business),
@@ -244,18 +251,45 @@ class _AppDrawerState extends State<AppDrawer> {
                     },
                   ),
                 if (_isAdminOrAssistente)
-                  ListTile(
-                    leading: const Icon(Icons.support_agent),
-                    title: const Text('Atendimentos'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushReplacementNamed(context, '/chat-history');
+                  ValueListenableBuilder<int>(
+                    valueListenable: ChatReadTracker.notifier,
+                    builder: (context, totalUnread, _) {
+                      return ListTile(
+                        leading: const Icon(Icons.support_agent),
+                        title: Row(
+                          children: [
+                            const Text('Atendimentos'),
+                            if (totalUnread > 0) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryRed,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '$totalUnread',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.pushReplacementNamed(context, '/chat-history');
+                        },
+                      );
                     },
                   ),
                 if (_userRole.toUpperCase() == 'ADMIN')
                   ListTile(
                     leading: const Icon(Icons.manage_accounts),
-                    title: const Text('Gestão de Usuários'),
+                    title: const Text('Gestão do Sistema'),
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.pushReplacementNamed(context, '/admin/users');

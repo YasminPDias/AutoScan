@@ -78,14 +78,62 @@ class AuthStorage {
     if (isEmpresaAdmin != null) _setBool('user_is_empresa_admin', isEmpresaAdmin);
   }
 
+  static Map<String, dynamic>? _getJwtPayload() {
+    final token = _get('auth_token') as String?;
+    if (token == null || token.isEmpty) return null;
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+      return jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      ) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<String?> getUserName() async => _get('user_name') as String?;
   static Future<String?> getUserEmail() async => _get('user_email') as String?;
-  static Future<String?> getUserId() async => _get('user_id') as String?;
+  static Future<String?> getUserId() async {
+    final payload = _getJwtPayload();
+    if (payload != null && payload['sub'] != null) {
+      return payload['sub'].toString();
+    }
+    if (payload != null && payload['id'] != null) {
+      return payload['id'].toString();
+    }
+    return _get('user_id') as String?;
+  }
+
   static Future<String?> getUserProfilePhoto() async => _get('user_profile_photo') as String?;
-  static Future<String?> getUserRole() async => _get('user_role') as String?;
+
+  /// Retorna o role decodificando diretamente do JWT token assinado (impede alteração manual no LocalStorage)
+  static Future<String?> getUserRole() async {
+    final payload = _getJwtPayload();
+    if (payload != null && payload['role'] != null) {
+      return payload['role'].toString();
+    }
+    if (payload != null && payload['papel'] != null) {
+      return payload['papel'].toString();
+    }
+    return _get('user_role') as String?;
+  }
+
   static Future<String?> getUserPhone() async => _get('user_phone') as String?;
   static Future<String?> getUserMemberSince() async => _get('user_member_since') as String?;
-  static Future<bool> isEmpresaAdmin() async => _get('user_is_empresa_admin') == true;
+
+  /// Retorna se é admin da empresa verificando o JWT token assinado
+  static Future<bool> isEmpresaAdmin() async {
+    final payload = _getJwtPayload();
+    if (payload != null && payload['isEmpresaAdmin'] != null) {
+      return payload['isEmpresaAdmin'] == true;
+    }
+    final role = await getUserRole();
+    if (role != null && (role.toUpperCase() == 'ADMIN' || role.toUpperCase() == 'EMPRESA_ADMIN')) {
+      return true;
+    }
+    return _get('user_is_empresa_admin') == true;
+  }
 
   static Future<void> clear() async {
     for (final key in _keys) {

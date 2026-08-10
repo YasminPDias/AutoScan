@@ -30,6 +30,32 @@ class PushService {
 
   String? _tokenAtual;
 
+  Future<bool> checarPermissao() async {
+    try {
+      final settings = await FirebaseMessaging.instance.getNotificationSettings();
+      return settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+    } catch (e) {
+      loggerService.w('Erro ao checar permissão de notificação: $e');
+      return false;
+    }
+  }
+
+  Future<bool> solicitarPermissao() async {
+    try {
+      final settings = await FirebaseMessaging.instance.requestPermission();
+      final granted = settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+      if (granted) {
+        await inicializar();
+      }
+      return granted;
+    } catch (e) {
+      loggerService.w('Erro ao solicitar permissão de notificação: $e');
+      return false;
+    }
+  }
+
   Future<void> inicializar() async {
     try {
       await FirebaseMessaging.instance.requestPermission();
