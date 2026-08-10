@@ -192,7 +192,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                                 ),
                                 SizedBox(height: 12),
                                 Text(
-                                  'Processando diagnóstico com IA...',
+                                  'Processando diagnóstico...',
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: AppColors.textSecondary,
@@ -269,7 +269,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                       CircularProgressIndicator(color: AppColors.primaryRed),
                       SizedBox(height: 12),
                       Text(
-                        'Processando diagnóstico com IA...',
+                        'Processando diagnóstico...',
                         style: TextStyle(
                           fontSize: 14,
                           color: AppColors.textSecondary,
