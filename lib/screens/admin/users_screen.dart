@@ -6,6 +6,9 @@ import '../../services/user_service.dart';
 import '../../services/auth_storage.dart';
 import '../../services/logger_service.dart';
 import '../../utils/validators.dart';
+import '../dashboard/dashboard_screen.dart';
+import '../empresa/empresa_funcionario_screen.dart';
+import 'gestao_empresas_tab.dart';
 
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});
@@ -77,13 +80,13 @@ class _UsersScreenState extends State<UsersScreen> {
     }
   }
 
-  void _abrirDialogCriar() {
+  void _abrirDialogCriar({String funcaoPadrao = 'CLIENTE'}) {
     final nomeCtrl = TextEditingController();
     final sobrenomeCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final senhaCtrl = TextEditingController();
     final telefoneCtrl = TextEditingController();
-    String funcaoSelecionada = 'CLIENTE';
+    String funcaoSelecionada = funcaoPadrao;
     bool enviando = false;
 
     showDialog(
@@ -564,150 +567,219 @@ class _UsersScreenState extends State<UsersScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return DesktopLayout(
-      currentRoute: '/admin/users',
-      title: 'Gestão de Usuários',
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _abrirDialogCriar,
-          backgroundColor: AppColors.primaryRed,
-          icon: const Icon(Icons.person_add, color: Colors.white),
-          label: const Text('Novo Usuário', style: TextStyle(color: Colors.white)),
+  Widget _buildAbaUsuarios({required bool apenasClientes, required String funcaoCriarPadrao}) {
+    final listaExibicao = _usuariosFiltrados.where((u) {
+      final funcao = (u['funcao'] ?? 'CLIENTE').toString().toUpperCase();
+      if (apenasClientes) {
+        return funcao == 'CLIENTE';
+      } else {
+        return funcao == 'ADMIN' || funcao == 'ASSISTENTE';
+      }
+    }).toList();
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _abrirDialogCriar(funcaoPadrao: funcaoCriarPadrao),
+        backgroundColor: AppColors.primaryRed,
+        icon: const Icon(Icons.person_add, color: Colors.white),
+        label: Text(
+          apenasClientes ? 'Novo Cliente' : 'Novo Assistente / Admin',
+          style: const TextStyle(color: Colors.white),
         ),
-        body: Column(
-          children: [
-            Container(
-              padding: EdgeInsets.all(context.isDesktop ? 24 : 16),
-              color: Colors.white,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      onChanged: (val) {
-                        setState(() => _filtrarUsuarios(val));
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'Buscar por nome, email ou função...',
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: AppColors.divider),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      ),
+      body: Column(
+        children: [
+          Container(
+            padding: EdgeInsets.all(context.isDesktop ? 24 : 16),
+            color: Colors.white,
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    onChanged: (val) {
+                      setState(() => _filtrarUsuarios(val));
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Buscar por nome, email ou telefone...',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppColors.divider),
                       ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: _carregarUsuarios,
-                    tooltip: 'Atualizar lista',
+                ),
+                const SizedBox(width: 12),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _carregarUsuarios,
+                  tooltip: 'Atualizar lista',
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppColors.primaryRed),
+                  )
+                : listaExibicao.isEmpty
+                    ? Center(
+                        child: Text(
+                          apenasClientes
+                              ? 'Nenhum cliente encontrado.'
+                              : 'Nenhum assistente ou admin encontrado.',
+                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 16),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: EdgeInsets.all(context.isDesktop ? 24 : 16),
+                        itemCount: listaExibicao.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final user = listaExibicao[index] as Map<String, dynamic>;
+                          final nome = '${user['nome'] ?? ''} ${user['sobrenome'] ?? ''}'.trim();
+                          final email = user['email'] ?? '';
+                          final telefone = user['telefone'] ?? '';
+                          final funcao = user['funcao'] ?? 'CLIENTE';
+                          final status = user['status']?.toString().toUpperCase();
+                          final isAtivo = status != 'INATIVO' && status != 'DESATIVADO';
+
+                          return Card(
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              side: const BorderSide(color: AppColors.divider),
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              leading: CircleAvatar(
+                                backgroundColor: AppColors.lightRed,
+                                child: Text(
+                                  nome.isNotEmpty ? nome[0].toUpperCase() : 'U',
+                                  style: const TextStyle(
+                                    color: AppColors.primaryRed,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              title: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      nome.isNotEmpty ? nome : 'Sem Nome',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _buildRoleBadge(funcao.toString()),
+                                ],
+                              ),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('E-mail: $email', style: const TextStyle(fontSize: 13)),
+                                    if (telefone.isNotEmpty)
+                                      Text('Telefone: $telefone', style: const TextStyle(fontSize: 13)),
+                                  ],
+                                ),
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit, color: Colors.blue),
+                                    onPressed: () => _abrirDialogEditar(user),
+                                    tooltip: 'Editar Usuário',
+                                  ),
+                                  if (isAtivo)
+                                    IconButton(
+                                      icon: const Icon(Icons.delete, color: AppColors.primaryRed),
+                                      onPressed: () => _confirmarDeletar(user),
+                                      tooltip: 'Deletar / Desativar Usuário',
+                                    )
+                                  else
+                                    IconButton(
+                                      icon: const Icon(Icons.restore, color: Colors.green),
+                                      onPressed: () => _confirmarReativar(user),
+                                      tooltip: 'Reativar Usuário',
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 4,
+      child: DesktopLayout(
+        currentRoute: '/admin/users',
+        title: 'Gestão do Sistema',
+        child: Column(
+          children: [
+            Container(
+              color: Colors.white,
+              child: const TabBar(
+                labelColor: AppColors.primaryRed,
+                unselectedLabelColor: AppColors.textSecondary,
+                indicatorColor: AppColors.primaryRed,
+                indicatorWeight: 3,
+                tabs: [
+                  Tab(
+                    icon: Icon(Icons.dashboard_outlined),
+                    text: 'Dashboard',
+                  ),
+                  Tab(
+                    icon: Icon(Icons.people_outline),
+                    text: 'Clientes',
+                  ),
+                  Tab(
+                    icon: Icon(Icons.business_outlined),
+                    text: 'Empresa',
+                  ),
+                  Tab(
+                    icon: Icon(Icons.admin_panel_settings_outlined),
+                    text: 'Assistentes & Admins',
                   ),
                 ],
               ),
             ),
             const Divider(height: 1),
             Expanded(
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: AppColors.primaryRed),
-                    )
-                  : _usuariosFiltrados.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'Nenhum usuário encontrado.',
-                            style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
-                          ),
-                        )
-                      : ListView.separated(
-                          padding: EdgeInsets.all(context.isDesktop ? 24 : 16),
-                          itemCount: _usuariosFiltrados.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            final user = _usuariosFiltrados[index] as Map<String, dynamic>;
-                            final nome = '${user['nome'] ?? ''} ${user['sobrenome'] ?? ''}'.trim();
-                            final email = user['email'] ?? '';
-                            final telefone = user['telefone'] ?? '';
-                            final funcao = user['funcao'] ?? 'CLIENTE';
-                            final status = user['status']?.toString().toUpperCase();
-                            final isAtivo = status != 'INATIVO' && status != 'DESATIVADO';
+              child: TabBarView(
+                children: [
+                  // Aba 1: Dashboard Integrado
+                  const DashboardScreen(isEmbedded: true),
 
-                            return Card(
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                side: const BorderSide(color: AppColors.divider),
-                              ),
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                                leading: CircleAvatar(
-                                  backgroundColor: AppColors.lightRed,
-                                  child: Text(
-                                    nome.isNotEmpty ? nome[0].toUpperCase() : 'U',
-                                    style: const TextStyle(
-                                      color: AppColors.primaryRed,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                title: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        nome.isNotEmpty ? nome : 'Sem Nome',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    _buildRoleBadge(funcao.toString()),
-                                  ],
-                                ),
-                                subtitle: Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text('E-mail: $email', style: const TextStyle(fontSize: 13)),
-                                      if (telefone.isNotEmpty)
-                                        Text('Telefone: $telefone', style: const TextStyle(fontSize: 13)),
-                                    ],
-                                  ),
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, color: Colors.blue),
-                                      onPressed: () => _abrirDialogEditar(user),
-                                      tooltip: 'Editar Usuário',
-                                    ),
-                                    if (isAtivo)
-                                      IconButton(
-                                        icon: const Icon(Icons.delete, color: AppColors.primaryRed),
-                                        onPressed: () => _confirmarDeletar(user),
-                                        tooltip: 'Deletar / Desativar Usuário',
-                                      )
-                                    else
-                                      IconButton(
-                                        icon: const Icon(Icons.restore, color: Colors.green),
-                                        onPressed: () => _confirmarReativar(user),
-                                        tooltip: 'Reativar Usuário',
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                  // Aba 2: Clientes
+                  _buildAbaUsuarios(apenasClientes: true, funcaoCriarPadrao: 'CLIENTE'),
+
+                  // Aba 3: Empresa / Funcionários
+                  const GestaoEmpresasTab(),
+
+                  // Aba 4: Assistentes & Admins
+                  _buildAbaUsuarios(apenasClientes: false, funcaoCriarPadrao: 'ASSISTENTE'),
+                ],
+              ),
             ),
           ],
         ),

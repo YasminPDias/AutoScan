@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../layouts/desktop_layout.dart';
 import '../../utils/responsive.dart';
-import '../../widgets_defaults/feature_card.dart';
 import '../../services/auth_storage.dart';
 import '../../services/diagnostic_service.dart';
 import '../../services/logger_service.dart';
+import '../../widgets_defaults/feature_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,6 +16,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _userName = '';
+  String _userRole = '';
   List<dynamic> _chamadosAbertos = [];
   bool _isLoadingChamados = true;
   String? _token;
@@ -29,8 +30,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadUserData() async {
     final name = await AuthStorage.getUserName();
+    final role = await AuthStorage.getUserRole();
     if (!mounted) return;
-    setState(() => _userName = name?.trim() ?? '');
+    setState(() {
+      _userName = name?.trim() ?? '';
+      _userRole = role?.trim() ?? '';
+    });
   }
 
   Future<void> _carregarChamadosAbertos() async {
@@ -60,9 +65,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String get _welcomeTitle {
-    if (_userName.isEmpty) return 'Bem-vindo ao Autex';
+    if (_userName.isEmpty) return 'Bem-vindo ao AutoScan';
     final firstName = _userName.split(' ').first.trim();
-    return firstName.isEmpty ? 'Bem-vindo ao Autex' : 'Bem-vindo, $firstName';
+    return firstName.isEmpty ? 'Bem-vindo ao AutoScan' : 'Bem-vindo, $firstName';
   }
 
   void _abrirChatDoChamado(Map<String, dynamic> item) {
@@ -98,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
         label = 'PENDENTE';
         break;
       case 'CONCLUIDO':
-        bg = const Color(0xE8E8F5E9);
+        bg = const Color(0xFFE8F5E9);
         fg = const Color(0xFF2E7D32);
         label = 'CONCLUÍDO';
         break;
@@ -132,26 +137,27 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.refresh, size: 20),
+              icon: const Icon(Icons.refresh, size: 18),
               onPressed: _carregarChamadosAbertos,
               tooltip: 'Atualizar chamados',
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         if (_isLoadingChamados)
           const Center(
             child: Padding(
-              padding: EdgeInsets.all(24),
+              padding: EdgeInsets.all(20),
               child: CircularProgressIndicator(color: AppColors.primaryRed),
             ),
           )
         else if (_chamadosAbertos.isEmpty)
-          Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(color: AppColors.border),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
             ),
             child: Padding(
               padding: const EdgeInsets.all(20),
@@ -209,7 +215,7 @@ class _HomeScreenState extends State<HomeScreen> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _chamadosAbertos.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
               final item = _chamadosAbertos[index] as Map<String, dynamic>;
               final status = item['status']?.toString() ?? 'PENDENTE';
@@ -218,6 +224,8 @@ class _HomeScreenState extends State<HomeScreen> {
               final ano = dados['anoVeiculo']?.toString() ?? '';
               final sintomas = dados['sintomas']?.toString() ?? 'Sem descrição de sintomas';
               final codObd = dados['codigoODB2']?.toString() ?? '';
+
+              final tituloVeiculo = veiculo.isNotEmpty ? (ano.isNotEmpty ? '$veiculo ($ano)' : veiculo) : 'Veículo não informado';
 
               return Card(
                 elevation: 0,
@@ -337,44 +345,49 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [BoxShadow(color: AppColors.primaryRed.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 8))],
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 140, height: 140,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4))],
-                ),
-                child: const Icon(Icons.directions_car_rounded, size: 70, color: Colors.white),
-              ),
-              const SizedBox(width: 32),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _welcomeTitle,
-                      style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: -0.5),
+              Row(
+                children: [
+                  Container(
+                    width: 140, height: 140,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4))],
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Sistema Profissional de Diagnóstico Automotivo',
-                      style: TextStyle(fontSize: 18, color: Colors.white.withValues(alpha: 0.95), fontWeight: FontWeight.w400),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
+                    child: const Icon(Icons.directions_car_rounded, size: 70, color: Colors.white),
+                  ),
+                  const SizedBox(width: 32),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildStatBadge('1000+', 'Diagnósticos'),
-                        const SizedBox(width: 24),
-                        _buildStatBadge('24/7', 'Suporte'),
-                        const SizedBox(width: 24),
-                        _buildStatBadge('IA', 'Avançada'),
+                        Text(
+                          _welcomeTitle,
+                          style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: -0.5),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Sistema Profissional de Diagnóstico Automotivo',
+                          style: TextStyle(fontSize: 18, color: Colors.white.withValues(alpha: 0.95), fontWeight: FontWeight.w400),
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            _buildStatBadge('1000+', 'Diagnósticos'),
+                            const SizedBox(width: 24),
+                            _buildStatBadge('24/7', 'Suporte'),
+                            const SizedBox(width: 24),
+                            _buildStatBadge('IA', 'Avançada'),
+                          ],
+                        ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -404,6 +417,14 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildEnhancedFeatureCard(icon: Icons.history, title: 'Histórico Completo', description: 'Acesse todos os diagnósticos', color: const Color(0xFFE64A19), onTap: () => Navigator.pushNamed(context, '/history')),
             _buildEnhancedFeatureCard(icon: Icons.support_agent, title: 'Suporte 24/7', description: 'Assistência sempre disponível', color: const Color(0xFF7B1FA2), onTap: () => Navigator.pushNamed(context, '/history')),
             _buildEnhancedFeatureCard(icon: Icons.trending_up, title: 'Relatórios Detalhados', description: 'Análises e estatísticas', color: const Color(0xFF00796B), onTap: () => Navigator.pushNamed(context, '/dashboard')),
+            if (_userRole.toUpperCase() == 'ADMIN')
+              _buildEnhancedFeatureCard(
+                icon: Icons.manage_accounts_outlined,
+                title: 'Gestão do Sistema',
+                description: 'Painel administrativo',
+                color: const Color(0xFF7B1FA2),
+                onTap: () => Navigator.pushNamed(context, '/admin/users'),
+              ),
           ],
         ),
       ],
@@ -469,6 +490,15 @@ class _HomeScreenState extends State<HomeScreen> {
           description: 'Conheça nossos planos e fique por dentro de todas as funcionalidades',
           onTap: () => Navigator.pushNamed(context, '/plans'),
         ),
+        if (_userRole.toUpperCase() == 'ADMIN') ...[
+          const SizedBox(height: 20),
+          FeatureCard(
+            icon: Icons.manage_accounts_outlined,
+            title: 'Gestão do Sistema',
+            description: 'Painel administrativo',
+            onTap: () => Navigator.pushNamed(context, '/admin/users'),
+          ),
+        ],
       ],
     );
   }
@@ -532,7 +562,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
-                Icon(Icons.arrow_forward, size: 16, color: color),
               ],
             ),
           ),

@@ -18,6 +18,7 @@ import '../../services/websocket_service.dart';
 import '../../services/web_audio_recorder.dart';
 import '../../services/chat_read_tracker.dart';
 import '../../services/api_config.dart';
+import '../../services/atendimento_service.dart';
 import '../../models/mensagem_model.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 class ChatScreen extends StatefulWidget {
@@ -42,15 +43,17 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isRecordingAudio = false;
   bool _isUploadingAudio = false;
   bool _isEncerrandoConversa = false;
+  Timer? _recordingTimer;
+  int _recordingSeconds = 0;
+
+  int _atendentesOnlineCount = 0;
+  bool _checkedAtendentes = false;
 
   // paginação de mensagens
   bool _isCarregandoMais = false;
   bool _temMaisMensagens = false;
   int _paginaAtual = 1;
   static const int _porPagina = 20;
-
-  Timer? _recordingTimer;
-  int _recordingSeconds = 0;
 
   String? _conversaId;
   String? _errorMessage;
@@ -154,6 +157,14 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _conversaStatus = data['status']?.toString() ?? '';
         _clienteId = data['clienteId']?.toString();
+      });
+    }
+
+    final atResult = await AtendimentoService.listarAtendentesOnline(token: _token!);
+    if (atResult['success'] == true && mounted) {
+      setState(() {
+        _atendentesOnlineCount = atResult['total'] as int? ?? 0;
+        _checkedAtendentes = true;
       });
     }
 
@@ -550,13 +561,65 @@ class _ChatScreenState extends State<ChatScreen> {
       showAppBar: !context.isDesktop,
       child: Scaffold(
         backgroundColor: AppColors.background,
-        appBar: context.isDesktop ? null : AppBar(
-          title: const Text('Chat'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () { if (Navigator.canPop(context)) Navigator.pop(context); else Navigator.pushReplacementNamed(context, '/home'); },
-          ),
-        ),
+        appBar: context.isDesktop
+            ? null
+            : AppBar(
+                title: Row(
+                  children: [
+                    const Text('Chat'),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _atendentesOnlineCount > 0
+                            ? const Color(0xFFE8F5E9)
+                            : const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _atendentesOnlineCount > 0
+                              ? const Color(0xFF4CAF50)
+                              : const Color(0xFFBDBDBD),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.circle,
+                            size: 8,
+                            color: _atendentesOnlineCount > 0
+                                ? const Color(0xFF4CAF50)
+                                : const Color(0xFF9E9E9E),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _atendentesOnlineCount > 0
+                                ? '$_atendentesOnlineCount Atendente${_atendentesOnlineCount > 1 ? 's' : ''} Online'
+                                : 'IA Pronta',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: _atendentesOnlineCount > 0
+                                  ? const Color(0xFF2E7D32)
+                                  : const Color(0xFF616161),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () {
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    } else {
+                      Navigator.pushReplacementNamed(context, '/home');
+                    }
+                  },
+                ),
+              ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator(color: AppColors.primaryRed))
             : _errorMessage != null

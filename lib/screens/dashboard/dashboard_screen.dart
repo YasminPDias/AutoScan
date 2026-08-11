@@ -5,9 +5,11 @@ import '../../utils/responsive.dart';
 import '../../services/auth_storage.dart';
 import '../../services/diagnostic_service.dart';
 import '../../services/dashboard_service.dart';
+import '../../services/chat_service.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final bool isEmbedded;
+  const DashboardScreen({super.key, this.isEmbedded = false});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -15,12 +17,19 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoading = true;
+  String _userRole = '';
 
   // Stats
   int _totalDiagnosticos = 0;
   int _pendentes = 0;
   int _resolvidos = 0;
   int _emAberto = 0;
+  int _conversasAbertas = 0;
+
+  bool get _isAdminOrAssistente {
+    final role = _userRole.toUpperCase();
+    return role == 'ADMIN' || role == 'ASSISTENTE';
+  }
 
   // Casos em aberto — paginação no servidor
   List<Map<String, dynamic>> _casosAbertos = [];
@@ -30,6 +39,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const int _porPaginaCasos = 10;
 
   Map<String, int> _porDia = {};
+  bool _mostrarTodosCasos = false;
 
   @override
   void initState() {
@@ -41,15 +51,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _isLoading = true);
 
     final token = await AuthStorage.getToken();
+    final role = await AuthStorage.getUserRole();
     if (token == null || token.isEmpty) {
       if (mounted) setState(() => _isLoading = false);
       return;
     }
+    if (mounted) setState(() => _userRole = role ?? '');
+
+    final isAdmin =
+        (role ?? '').toUpperCase() == 'ADMIN' ||
+        (role ?? '').toUpperCase() == 'ASSISTENTE';
 
     final results = await Future.wait([
       DashboardService.buscarResumoDiagnosticos(token: token),
       DashboardService.buscarHistoricoSemanal(token: token),
       DiagnosticService.buscarDiagnosticosAbertosAdmin(token: token, pagina: 1, porPagina: _porPaginaCasos),
+      if (isAdmin) ChatService.buscarTodasConversas(token: token),
     ]);
 
     if (!mounted) return;
@@ -97,12 +114,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
 
+    // Conta conversas abertas (admin)
+    int conversasAbertas = 0;
+    if (isAdmin && results.length > 3) {
+      final convResult = results[3] as Map<String, dynamic>;
+      if (convResult['success'] == true && convResult['data'] != null) {
+        final convList = convResult['data'] as List;
+        conversasAbertas = convList.where((c) {
+          final status = (c as Map<String, dynamic>)['status']?.toString() ?? '';
+          return status != 'ENCERRADA' && status != 'FECHADA' && status != 'CONCLUIDA';
+        }).length;
+      }
+    }
+
     if (mounted) {
       setState(() {
         _porDia = porDia;
         _casosAbertos = casos;
         _paginaCasos = 1;
         _totalPaginasCasos = totalPaginas;
+        _conversasAbertas = conversasAbertas;
         _isLoading = false;
       });
     }
@@ -162,41 +193,71 @@ Future<void> _irParaPaginaCasos(int pagina) async {
     } catch (_) { return isoDate; }
   }
 
+  void _abrirChatDoCaso(Map<String, dynamic> item) {
+    final diagnosticoId = item['id']?.toString() ?? item['_id']?.toString();
+    final conversa = item['conversa'] as Map<String, dynamic>?;
+    final conversaId = conversa?['id']?.toString() ?? conversa?['_id']?.toString();
+
+    if (conversaId != null && conversaId.isNotEmpty) {
+      Navigator.pushNamed(context, '/chat', arguments: {'conversaId': conversaId});
+    } else if (diagnosticoId != null && diagnosticoId.isNotEmpty) {
+      final diagnosticoTexto = item['diagnostico']?.toString() ?? item['resultadoIA']?.toString();
+      Navigator.pushNamed(
+        context,
+        '/chat',
+        arguments: {
+          'diagnosticoId': diagnosticoId,
+          'diagnosticoTexto': diagnosticoTexto,
+        },
+      );
+    } else {
+      Navigator.pushNamed(context, '/chat');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bodyContent = Container(
+      color: AppColors.background,
+      child: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primaryRed),
+            )
+          : RefreshIndicator(
+              onRefresh: _carregar,
+              color: AppColors.primaryRed,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.all(context.isDesktop ? 40 : 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle('Visão Geral'),
+                    const SizedBox(height: 16),
+                    _buildStatGrid(context),
+                    const SizedBox(height: 32),
+                    _buildSectionTitle('Casos em Aberto'),
+                    const SizedBox(height: 16),
+                    _buildCasosAbertos(context),
+                    const SizedBox(height: 32),
+                    _buildSectionTitle('Diagnósticos — Últimos 7 Dias'),
+                    const SizedBox(height: 16),
+                    _buildBarChart(),
+                  ],
+                ),
+              ),
+            ),
+    );
+
+    if (widget.isEmbedded) {
+      return bodyContent;
+    }
+
     return DesktopLayout(
       currentRoute: '/dashboard',
       title: 'Dashboard',
       showAppBar: !context.isDesktop,
-      child: Container(
-        color: AppColors.background,
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: AppColors.primaryRed))
-            : RefreshIndicator(
-                onRefresh: _carregar,
-                color: AppColors.primaryRed,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.all(context.isDesktop ? 40 : 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildSectionTitle('Visão Geral'),
-                      const SizedBox(height: 16),
-                      _buildStatGrid(context),
-                      const SizedBox(height: 32),
-                      _buildSectionTitle('Casos em Aberto'),
-                      const SizedBox(height: 16),
-                      _buildCasosAbertos(context),
-                      const SizedBox(height: 32),
-                      _buildSectionTitle('Diagnósticos — Últimos 7 Dias'),
-                      const SizedBox(height: 16),
-                      _buildBarChart(),
-                    ],
-                  ),
-                ),
-              ),
-      ),
+      child: bodyContent,
     );
   }
 
@@ -226,16 +287,22 @@ Future<void> _irParaPaginaCasos(int pagina) async {
       _StatData(icon: Icons.hourglass_empty_outlined, value: '$_pendentes', label: 'Pendentes', color: const Color(0xFFE65100)),
       _StatData(icon: Icons.check_circle_outline, value: '$_resolvidos', label: 'Resolvidos', color: const Color(0xFF388E3C)),
       _StatData(icon: Icons.warning_amber_outlined, value: '$_emAberto', label: 'Casos em Aberto', color: const Color(0xFFF9A825)),
+      if (_isAdminOrAssistente)
+        _StatData(icon: Icons.chat_outlined, value: '$_conversasAbertas', label: 'Conversas Abertas', color: const Color(0xFF1976D2)),
     ];
+
+    final crossCount = _isAdminOrAssistente ? (context.isDesktop ? 5 : 2) : (context.isDesktop ? 4 : 2);
 
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: context.isDesktop ? 4 : 2,
+        crossAxisCount: crossCount,
         mainAxisSpacing: context.isDesktop ? 20 : 12,
         crossAxisSpacing: context.isDesktop ? 20 : 12,
-        childAspectRatio: context.isDesktop ? 1.6 : 1.3,
+        childAspectRatio: _isAdminOrAssistente
+            ? (context.isDesktop ? 1.35 : 1.3)
+            : (context.isDesktop ? 1.6 : 1.3),
       ),
       itemCount: cards.length,
       itemBuilder: (_, i) => _buildStatCard(cards[i]),
@@ -244,7 +311,7 @@ Future<void> _irParaPaginaCasos(int pagina) async {
 
   Widget _buildStatCard(_StatData data) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(context.isDesktop ? 12 : 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -263,8 +330,23 @@ Future<void> _irParaPaginaCasos(int pagina) async {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(data.value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: data.color)),
-              Text(data.label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              Text(
+                data.value,
+                style: TextStyle(
+                  fontSize: _isAdminOrAssistente ? (context.isDesktop ? 22 : 28) : 28,
+                  fontWeight: FontWeight.bold,
+                  color: data.color,
+                ),
+              ),
+              Text(
+                data.label,
+                style: TextStyle(
+                  fontSize: _isAdminOrAssistente ? (context.isDesktop ? 11 : 12) : 12,
+                  color: AppColors.textSecondary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ],
@@ -286,6 +368,12 @@ Future<void> _irParaPaginaCasos(int pagina) async {
         ),
       );
     }
+
+    const int limite = 4;
+    final bool temMais = _casosAbertos.length > limite;
+    final listaExibicao = (_mostrarTodosCasos || !temMais)
+        ? _casosAbertos
+        : _casosAbertos.take(limite).toList();
 
     return Column(
       children: [
