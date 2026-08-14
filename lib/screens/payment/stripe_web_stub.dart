@@ -1,21 +1,29 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_stripe/flutter_stripe.dart' show CardFieldInputDetails;
 
 class WebPaymentElement extends StatelessWidget {
-  final String clientSecret;
-  final dynamic onCardChanged;
-
   const WebPaymentElement({
-    Key? key,
+    super.key,
     required this.clientSecret,
-    this.onCardChanged,
-  }) : super(key: key);
+    required this.onCardChanged,
+  });
+
+  final String clientSecret;
+  final void Function(CardFieldInputDetails?) onCardChanged; 
 
   @override
-  Widget build(BuildContext context) {
-    return const SizedBox.shrink();
-  }
+  Widget build(BuildContext context) =>
+      throw UnsupportedError('WebPaymentElement só roda em Flutter web');
 }
 
-Future<void> confirmWebSetupElement({required String returnUrl}) async {
-  // Stub para mobile. A implementação real fica no stripe_web_impl.dart
+Future<void> confirmWebSetupElement({required String returnUrl}) {
+  throw UnsupportedError('confirmWebSetupElement só roda em Flutter web');
+}
+
+void salvarContextoRedirect(Map<String, String> dados) {
+  throw UnsupportedError('salvarContextoRedirect só roda em Flutter web');
+}
+
+Map<String, String>? lerContextoRedirect() {
+  throw UnsupportedError('lerContextoRedirect só roda em Flutter web');
 }

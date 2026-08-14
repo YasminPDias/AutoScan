@@ -1,3 +1,4 @@
+import 'package:autex/screens/payment/stripe_web_impl.dart';
 import 'package:autex/services/empresa/plano_service.dart';
 import 'package:autex/services/payment/cobranca_utils.dart';
 import 'package:autex/services/payment/pagamento_service.dart';
@@ -8,7 +9,7 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../theme/app_colors.dart';
 import '../../services/auth_storage.dart';
-import '../../models/plano_model.dart';
+import '../../models/plano_model.dart'; // confere o caminho certo aí
 
 enum MetodoPagamento { cartao, pix, boleto }
 
@@ -63,8 +64,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
   MetodoPagamento? _metodoPagamento;
   String? _clientSecret;
   String? _paymentMethodId;
+  String? _setupIntentIdConfirmado;
   CardFieldInputDetails? _card;
   final _nomeCartaoController = TextEditingController();
+  final _cardFormController = CardFormEditController();
 
   String? _urlFatura;
 
@@ -73,6 +76,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
     super.didChangeDependencies();
     if (_argsLidos) return;
     _argsLidos = true;
+
+    // volta de um redirect de 3DS (página recarregou) — retoma direto pra
+    // finalizar a assinatura, sem passar pelo formulário de novo
+    if (kIsWeb) {
+      final query = Uri.base.queryParameters;
+      if (query.containsKey('setup_intent') && query.containsKey('redirect_status')) {
+        _retomarAposRedirect(query);
+        return;
+      }
+    }
+
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     _planoId = args?['planoId']?.toString();
     _planoNome = args?['planoNome']?.toString();
@@ -110,6 +124,30 @@ class _PaymentScreenState extends State<PaymentScreen> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _retomarAposRedirect(Map<String, String> query) async {
+    final status = query['redirect_status'];
+    final setupIntentId = query['setup_intent'];
+    final contexto = lerContextoRedirect();
+
+    _planoId = contexto?['planoId'];
+    _planoNome = contexto?['planoNome'];
+    _empresaId = contexto?['empresaId'];
+    _metodoPagamento = MetodoPagamento.cartao; // só cartão passa por redirect
+
+    if (status != 'succeeded' || setupIntentId == null || _planoId == null) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = status == 'succeeded'
+            ? 'Não foi possível retomar automaticamente. Selecione o plano novamente.'
+            : 'A confirmação do cartão não foi concluída. Tente novamente.';
+      });
+      return;
+    }
+
+    setState(() => _isLoading = false);
+    await _enviarAssinatura(setupIntentId: setupIntentId);
+  }
+
   @override
   void dispose() {
     _cpfController.dispose();
@@ -122,6 +160,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     _cidadeController.dispose();
     _estadoController.dispose();
     _nomeCartaoController.dispose();
+    _cardFormController.dispose();
     super.dispose();
   }
 
@@ -241,8 +280,29 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   Future<void> _confirmarCartao() async {
-    if (_paymentMethodId != null) {
-      return _enviarAssinatura(paymentMethodId: _paymentMethodId);
+    if (_paymentMethodId != null || _setupIntentIdConfirmado != null) {
+      return _enviarAssinatura(
+        paymentMethodId: _paymentMethodId,
+        setupIntentId: _setupIntentIdConfirmado,
+      );
+    }
+
+    if (kIsWeb) {
+      try {
+        salvarContextoRedirect({
+          'planoId': _planoId!,
+          if (_planoNome != null) 'planoNome': _planoNome!,
+          if (_empresaId != null) 'empresaId': _empresaId!,
+        });
+        await confirmWebSetupElement(returnUrl: Uri.base.toString());
+        _setupIntentIdConfirmado = _clientSecret!.split('_secret_').first;
+        await _enviarAssinatura(setupIntentId: _setupIntentIdConfirmado);
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _isSubmitting = false);
+        _mostrarErro('Erro ao processar o cartão: $e');
+      }
+      return;
     }
 
     try {
@@ -268,7 +328,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
   }
 
-  Future<void> _enviarAssinatura({String? paymentMethodId}) async {
+  Future<void> _enviarAssinatura({String? paymentMethodId, String? setupIntentId}) async {
     final token = await AuthStorage.getToken();
     if (!mounted) return;
     if (token == null) {
@@ -283,6 +343,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         planoId: _planoId!,
         metodoPagamento: _metodoPagamento!.valorApi,
         paymentMethodId: paymentMethodId,
+        setupIntentId: setupIntentId,
         empresaId: _empresaId,
       );
 
@@ -413,194 +474,198 @@ class _PaymentScreenState extends State<PaymentScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_planoNome != null)
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 24),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryRed.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.primaryRed.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.workspace_premium, color: AppColors.primaryRed),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text('Plano selecionado: $_planoNome',
-                              style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.primaryRed)),
-                        ),
-                      ],
-                    ),
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 24),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.primaryRed.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primaryRed.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.workspace_premium, color: AppColors.primaryRed),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text('Plano selecionado: $_planoNome',
+                        style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.primaryRed)),
                   ),
-                const Text('Dados de cobrança',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                const SizedBox(height: 16),
-                if (_empresaId == null) ...[
-                  TextFormField(
-                    controller: _cpfController,
-                    decoration: const InputDecoration(labelText: 'CPF', border: OutlineInputBorder()),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [MaskTextInputFormatter('000.000.000-00')],
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Informe o CPF';
-                      if (!CpfValidator.isValid(v)) return 'CPF inválido';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
                 ],
-                TextFormField(
-                  controller: _telefoneController,
-                  decoration: const InputDecoration(labelText: 'Telefone', border: OutlineInputBorder()),
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [MaskTextInputFormatter('(00) 00000-0000')],
-                  validator: (v) {
-                    final digits = (v ?? '').replaceAll(RegExp(r'\D'), '');
-                    return digits.length < 10 ? 'Telefone inválido' : null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _cepController,
-                  decoration: InputDecoration(
-                    labelText: 'CEP',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: _buscandoCep
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                          )
-                        : null,
-                  ),
+              ),
+            ),
+          const Text('Dados de cobrança',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+          const SizedBox(height: 16),
+          if (_empresaId == null) ...[
+            TextFormField(
+              controller: _cpfController,
+              decoration: const InputDecoration(labelText: 'CPF', border: OutlineInputBorder()),
+              keyboardType: TextInputType.number,
+              inputFormatters: [MaskTextInputFormatter('000.000.000-00')],
+              validator: (v) {
+                if (v == null || v.isEmpty) return 'Informe o CPF';
+                if (!CpfValidator.isValid(v)) return 'CPF inválido';
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+          TextFormField(
+            controller: _telefoneController,
+            decoration: const InputDecoration(labelText: 'Telefone', border: OutlineInputBorder()),
+            keyboardType: TextInputType.phone,
+            inputFormatters: [MaskTextInputFormatter('(00) 00000-0000')],
+            validator: (v) {
+              final digits = (v ?? '').replaceAll(RegExp(r'\D'), '');
+              return digits.length < 10 ? 'Telefone inválido' : null;
+            },
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _cepController,
+            decoration: InputDecoration(
+              labelText: 'CEP',
+              border: const OutlineInputBorder(),
+              suffixIcon: _buscandoCep
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                    )
+                  : null,
+            ),
+            keyboardType: TextInputType.number,
+            inputFormatters: [MaskTextInputFormatter('00000-000')],
+            onChanged: (v) {
+              if (v.replaceAll(RegExp(r'\D'), '').length == 8) _buscarCep();
+            },
+            validator: (v) => (v ?? '').replaceAll(RegExp(r'\D'), '').length != 8 ? 'CEP inválido' : null,
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _logradouroController,
+            decoration: const InputDecoration(labelText: 'Endereço', border: OutlineInputBorder()),
+            validator: (v) => (v == null || v.isEmpty) ? 'Informe o endereço' : null,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _numeroController,
+                  decoration: const InputDecoration(labelText: 'Número', border: OutlineInputBorder()),
                   keyboardType: TextInputType.number,
-                  inputFormatters: [MaskTextInputFormatter('00000-000')],
-                  onChanged: (v) {
-                    if (v.replaceAll(RegExp(r'\D'), '').length == 8) _buscarCep();
-                  },
-                  validator: (v) => (v ?? '').replaceAll(RegExp(r'\D'), '').length != 8 ? 'CEP inválido' : null,
+                  validator: (v) => (v == null || v.isEmpty) ? 'Obrigatório' : null,
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _logradouroController,
-                  decoration: const InputDecoration(labelText: 'Endereço', border: OutlineInputBorder()),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Informe o endereço' : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: TextFormField(
+                  controller: _complementoController,
+                  decoration: const InputDecoration(labelText: 'Complemento (opcional)', border: OutlineInputBorder()),
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _numeroController,
-                        decoration: const InputDecoration(labelText: 'Número', border: OutlineInputBorder()),
-                        keyboardType: TextInputType.number,
-                        validator: (v) => (v == null || v.isEmpty) ? 'Obrigatório' : null,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: TextFormField(
-                        controller: _complementoController,
-                        decoration:
-                            const InputDecoration(labelText: 'Complemento (opcional)', border: OutlineInputBorder()),
-                      ),
-                    ),
-                  ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _bairroController,
+            decoration: const InputDecoration(labelText: 'Bairro', border: OutlineInputBorder()),
+            validator: (v) => (v == null || v.isEmpty) ? 'Informe o bairro' : null,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: TextFormField(
+                  controller: _cidadeController,
+                  decoration: const InputDecoration(labelText: 'Cidade', border: OutlineInputBorder()),
+                  validator: (v) => (v == null || v.isEmpty) ? 'Obrigatório' : null,
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _bairroController,
-                  decoration: const InputDecoration(labelText: 'Bairro', border: OutlineInputBorder()),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Informe o bairro' : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextFormField(
+                  controller: _estadoController,
+                  decoration: const InputDecoration(
+                    labelText: 'UF',
+                    border: OutlineInputBorder(),
+                    counterText: '',
+                  ),
+                  maxLength: 2,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: [UpperCaseTextFormatter()],
+                  validator: (v) => (v == null || v.length != 2) ? 'UF' : null,
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: TextFormField(
-                        controller: _cidadeController,
-                        decoration: const InputDecoration(labelText: 'Cidade', border: OutlineInputBorder()),
-                        validator: (v) => (v == null || v.isEmpty) ? 'Obrigatório' : null,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _estadoController,
-                        decoration: const InputDecoration(labelText: 'UF', border: OutlineInputBorder()),
-                        maxLength: 2,
-                        textCapitalization: TextCapitalization.characters,
-                        inputFormatters: [UpperCaseTextFormatter()],
-                        validator: (v) => (v == null || v.length != 2) ? 'UF' : null,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                const Text('Forma de pagamento',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                const SizedBox(height: 16),
-                Row(
-                  children: MetodoPagamento.values.map((m) {
-                    final selecionado = _metodoPagamento == m;
-                    return Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: InkWell(
-                          onTap: _isSubmitting ? null : () => _selecionarMetodo(m),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            decoration: BoxDecoration(
-                              color: selecionado ? AppColors.primaryRed.withValues(alpha: 0.1) : null,
-                              border: Border.all(
-                                color: selecionado ? AppColors.primaryRed : AppColors.divider,
-                                width: selecionado ? 2 : 1,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Column(
-                              children: [
-                                Icon(m.icone, color: selecionado ? AppColors.primaryRed : AppColors.textSecondary),
-                                const SizedBox(height: 8),
-                                Text(m.label,
-                                    style: TextStyle(
-                                      color: selecionado ? AppColors.primaryRed : AppColors.textSecondary,
-                                      fontWeight: selecionado ? FontWeight.w600 : FontWeight.normal,
-                                    )),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 16),
-                if (_metodoPagamento == MetodoPagamento.cartao) _buildCartaoForm(),
-                if (_metodoPagamento == MetodoPagamento.pix)
-                  _buildAvisoPixBoleto('Depois de confirmar, você recebe um QR code PIX. O acesso libera assim que o pagamento cair.'),
-                if (_metodoPagamento == MetodoPagamento.boleto)
-                  _buildAvisoPixBoleto('Depois de confirmar, você recebe um boleto. O acesso libera após a compensação — até 2 dias úteis.'),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isSubmitting ? null : _confirmar,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryRed,
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          const Text('Forma de pagamento',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+          const SizedBox(height: 16),
+          Row(
+            children: MetodoPagamento.values.map((m) {
+              final selecionado = _metodoPagamento == m;
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: InkWell(
+                    onTap: _isSubmitting ? null : () => _selecionarMetodo(m),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      decoration: BoxDecoration(
+                        color: selecionado ? AppColors.primaryRed.withValues(alpha: 0.1) : null,
+                        border: Border.all(
+                          color: selecionado ? AppColors.primaryRed : AppColors.divider,
+                          width: selecionado ? 2 : 1,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(m.icone, color: selecionado ? AppColors.primaryRed : AppColors.textSecondary),
+                          const SizedBox(height: 8),
+                          Text(m.label,
+                              style: TextStyle(
+                                color: selecionado ? AppColors.primaryRed : AppColors.textSecondary,
+                                fontWeight: selecionado ? FontWeight.w600 : FontWeight.normal,
+                              )),
+                        ],
+                      ),
                     ),
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Text('Confirmar assinatura',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                   ),
                 ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+          if (_metodoPagamento == MetodoPagamento.cartao) _buildCartaoForm(),
+          if (_metodoPagamento == MetodoPagamento.pix)
+            _buildAvisoPixBoleto('Depois de confirmar, você recebe um QR code PIX. O acesso libera assim que o pagamento cair.'),
+          if (_metodoPagamento == MetodoPagamento.boleto)
+            _buildAvisoPixBoleto('Depois de confirmar, você recebe um boleto. O acesso libera após a compensação — até 2 dias úteis.'),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isSubmitting ? null : _confirmar,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryRed,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('Confirmar assinatura',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+            ),
+          ),
         ],
       ),
     );
@@ -676,14 +741,25 @@ class _PaymentScreenState extends State<PaymentScreen> {
           decoration: const InputDecoration(labelText: 'Nome impresso no cartão', border: OutlineInputBorder()),
         ),
         const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.divider),
-            borderRadius: BorderRadius.circular(12),
+        if (kIsWeb)
+          WebPaymentElement(
+            clientSecret: _clientSecret!,
+            onCardChanged: (details) => setState(() => _card = details),
+          )
+        else
+          CardFormField(
+            controller: _cardFormController,
+            enablePostalCode: false,
+            style: CardFormStyle(
+              borderColor: AppColors.divider,
+              borderRadius: 12,
+              borderWidth: 1,
+              textColor: AppColors.textPrimary,
+              placeholderColor: AppColors.textSecondary,
+              cursorColor: AppColors.primaryRed,
+            ),
+            onCardChanged: (details) => setState(() => _card = details),
           ),
-          child: CardField(onCardChanged: (details) => setState(() => _card = details)),
-        ),
         const SizedBox(height: 8),
         const Text('Seus dados de pagamento são processados com segurança pelo Stripe.',
             style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
