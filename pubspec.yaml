@@ -50,6 +50,9 @@ dependencies:
   firebase_messaging: ^16.4.1
   flutter_markdown: ^0.7.3
   flutter_stripe_web: ^8.1.0
+  flutter_image_compress: ^2.5.1
+  image_picker: ^1.2.3
+  cached_network_image: ^3.4.1
 
 dev_dependencies:
   flutter_test:

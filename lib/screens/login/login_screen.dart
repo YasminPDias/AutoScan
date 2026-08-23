@@ -268,7 +268,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (token.isNotEmpty) {
           socketService.conectar(token);
-          await pushService.inicializar();
+          pushService.inicializar(); // não usar await para não travar o fluxo
         }
 
         if (!mounted) return;

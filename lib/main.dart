@@ -41,7 +41,7 @@ void main() async {
     final token = await AuthStorage.getToken();
     if (token != null) {
       socketService.conectar(token);
-      await pushService.inicializar();
+      pushService.inicializar(); // não usar await para não travar o fluxo
       await ChatReadTracker.carregarDaApi(token);
     }
   }
