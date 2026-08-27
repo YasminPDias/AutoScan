@@ -155,34 +155,64 @@ class _EmpresaFuncionariosScreenState extends State<EmpresaFuncionariosScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _empresaNome ?? 'Minha Empresa',
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                      ),
-                      Text(
-                        '${_membros.length} funcionário${_membros.length != 1 ? 's' : ''}',
-                        style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  ElevatedButton.icon(
-                    onPressed: _abrirModalAdicionarFuncionario,
-                    icon: const Icon(Icons.person_add, color: Colors.white, size: 18),
-                    label: const Text('Adicionar funcionário', style: TextStyle(color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryRed,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              context.isDesktop
+                  ? Row(
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _empresaNome ?? 'Minha Empresa',
+                              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                            Text(
+                              '${_membros.length} funcionário${_membros.length != 1 ? 's' : ''}',
+                              style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        ElevatedButton.icon(
+                          onPressed: _abrirModalAdicionarFuncionario,
+                          icon: const Icon(Icons.person_add, color: Colors.white, size: 18),
+                          label: const Text('Adicionar funcionário', style: TextStyle(color: Colors.white)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryRed,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _empresaNome ?? 'Minha Empresa',
+                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Text(
+                              '${_membros.length} funcionário${_membros.length != 1 ? 's' : ''}',
+                              style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                            ),
+                            const Spacer(),
+                            ElevatedButton.icon(
+                              onPressed: _abrirModalAdicionarFuncionario,
+                              icon: const Icon(Icons.person_add, color: Colors.white, size: 16),
+                              label: const Text('Adicionar', style: TextStyle(color: Colors.white, fontSize: 13)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryRed,
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
               const SizedBox(height: 24),
 
               if (_isLoading)
@@ -280,10 +310,12 @@ class _EmpresaFuncionariosScreenState extends State<EmpresaFuncionariosScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
                       children: [
                         Text(nome, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(

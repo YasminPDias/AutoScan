@@ -110,13 +110,22 @@ class AuthStorage {
   /// Retorna o role decodificando diretamente do JWT token assinado (impede alteração manual no LocalStorage)
   static Future<String?> getUserRole() async {
     final payload = _getJwtPayload();
-    if (payload != null && payload['role'] != null) {
-      return payload['role'].toString();
+    if (payload != null) {
+      if (payload['funcao'] != null && payload['funcao'].toString().trim().isNotEmpty) {
+        return payload['funcao'].toString().trim();
+      }
+      if (payload['role'] != null && payload['role'].toString().trim().isNotEmpty) {
+        return payload['role'].toString().trim();
+      }
+      if (payload['papel'] != null && payload['papel'].toString().trim().isNotEmpty) {
+        return payload['papel'].toString().trim();
+      }
+      if (payload['perfil'] != null && payload['perfil'].toString().trim().isNotEmpty) {
+        return payload['perfil'].toString().trim();
+      }
     }
-    if (payload != null && payload['papel'] != null) {
-      return payload['papel'].toString();
-    }
-    return _get('user_role') as String?;
+    final storedRole = _get('user_role') as String?;
+    return storedRole?.trim();
   }
 
   static Future<String?> getUserPhone() async => _get('user_phone') as String?;
@@ -129,8 +138,11 @@ class AuthStorage {
       return payload['isEmpresaAdmin'] == true;
     }
     final role = await getUserRole();
-    if (role != null && (role.toUpperCase() == 'ADMIN' || role.toUpperCase() == 'EMPRESA_ADMIN')) {
-      return true;
+    if (role != null) {
+      final rUpper = role.trim().toUpperCase();
+      if (rUpper == 'ADMIN' || rUpper == 'EMPRESA_ADMIN' || rUpper == 'ADMIN_EMPRESA') {
+        return true;
+      }
     }
     return _get('user_is_empresa_admin') == true;
   }

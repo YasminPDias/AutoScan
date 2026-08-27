@@ -411,6 +411,150 @@ Future<void> _irParaPaginaCasos(int pagina) async {
     final atendenteNome = conversa?['atendenteNome']?.toString();
     final conversaId = conversa?['id']?.toString();
 
+    if (!context.isDesktop) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            )
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top Row: ODB2 and Vehicle
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 70,
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryRed.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    codigo.isNotEmpty ? codigo.toUpperCase() : 'S/C',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryRed,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    [marca, modelo, ano].where((s) => s.isNotEmpty).join(' '),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            // Client and Date
+            Row(
+              children: [
+                const Icon(Icons.person_outline, size: 13, color: AppColors.textSecondary),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    nomeCliente.isNotEmpty ? nomeCliente : 'Sem identificação',
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                const Icon(Icons.access_time, size: 13, color: AppColors.textLight),
+                const SizedBox(width: 4),
+                Text(
+                  _formatDate(createdAt),
+                  style: const TextStyle(fontSize: 12, color: AppColors.textLight),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Divider(height: 1, color: AppColors.divider),
+            const SizedBox(height: 12),
+            // Status and Actions
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: conversaStatus != null
+                        ? _buildBadgeConversa(conversaStatus, atendenteNome)
+                        : Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF9A825).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Sem atendente',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFF9A825),
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                if (conversaId != null)
+                  TextButton.icon(
+                    onPressed: () => Navigator.pushNamed(context, '/chat', arguments: {'conversaId': conversaId}),
+                    icon: const Icon(Icons.chat_bubble_outline, size: 14),
+                    label: const Text('Ver chat', style: TextStyle(fontSize: 12)),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primaryRed,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      backgroundColor: AppColors.primaryRed.withValues(alpha: 0.05),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  )
+                else
+                  TextButton.icon(
+                    onPressed: () => Navigator.pushNamed(context, '/diagnostic-result', arguments: item),
+                    icon: const Icon(Icons.visibility_outlined, size: 14),
+                    label: const Text('Ver diagnóstico', style: TextStyle(fontSize: 12)),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      backgroundColor: AppColors.border.withValues(alpha: 0.2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),

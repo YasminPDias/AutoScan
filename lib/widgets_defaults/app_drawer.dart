@@ -9,7 +9,8 @@ import '../services/chat_read_tracker.dart';
 import 'network_avatar_image.dart';
 
 class AppDrawer extends StatefulWidget {
-  const AppDrawer({super.key});
+  final String? currentRoute;
+  const AppDrawer({super.key, this.currentRoute});
 
   @override
   State<AppDrawer> createState() => _AppDrawerState();
@@ -25,7 +26,7 @@ class _AppDrawerState extends State<AppDrawer> {
   bool _photoLoadFailed = false;
 
   bool get _isAdminOrAssistente {
-    final role = _userRole.toUpperCase();
+    final role = _userRole.trim().toUpperCase();
     return role == 'ADMIN' || role == 'ASSISTENTE';
   }
 
@@ -139,6 +140,7 @@ class _AppDrawerState extends State<AppDrawer> {
     }
 
     if (mounted) {
+      print('DEBUG APP_DRAWER: name="$name", role="$role", isEmpAdmin=$isEmpAdmin');
       setState(() {
         _userName = name ?? 'Usuário';
         _userEmail = email ?? '';
@@ -234,20 +236,20 @@ class _AppDrawerState extends State<AppDrawer> {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.person),
-                  title: const Text('Perfil'),
+                  leading: const Icon(Icons.analytics_outlined),
+                  title: const Text('Diagnóstico'),
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.pushReplacementNamed(context, '/profile');
+                    Navigator.pushReplacementNamed(context, '/diagnostic');
                   },
                 ),
-                if (_isEmpresaAdmin)
+                if (widget.currentRoute == '/chat')
                   ListTile(
-                    leading: const Icon(Icons.business),
-                    title: const Text('Empresa'),
+                    leading: const Icon(Icons.chat_bubble_outline),
+                    title: const Text('Chat'),
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.pushReplacementNamed(context, '/empresa/funcionarios');
+                      Navigator.pushReplacementNamed(context, '/chat');
                     },
                   ),
                 if (_isAdminOrAssistente)
@@ -286,15 +288,48 @@ class _AppDrawerState extends State<AppDrawer> {
                       );
                     },
                   ),
-                if (_userRole.toUpperCase() == 'ADMIN')
+                if (_isEmpresaAdmin || _userRole.trim().toUpperCase() == 'ADMIN_EMPRESA')
                   ListTile(
-                    leading: const Icon(Icons.manage_accounts),
-                    title: const Text('Gestão do Sistema'),
+                    leading: const Icon(Icons.business),
+                    title: const Text('Empresa'),
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.pushReplacementNamed(context, '/admin/users');
+                      Navigator.pushReplacementNamed(context, '/empresa/funcionarios');
                     },
                   ),
+                ListTile(
+                  leading: const Icon(Icons.manage_accounts),
+                  title: const Text('Gestão do Sistema'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.pushReplacementNamed(context, '/admin/users');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.history),
+                  title: const Text('Histórico'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.pushReplacementNamed(context, '/history');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.description_outlined),
+                  title: const Text('Planos'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.pushReplacementNamed(context, '/plans');
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.person),
+                  title: const Text('Perfil'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.pushReplacementNamed(context, '/profile');
+                  },
+                ),
                 const Divider(),
                 ListTile(
                   leading: const Icon(Icons.exit_to_app),

@@ -14,6 +14,8 @@ class EmpresaService {
     required String estado,
   }) async {
     try {
+      final cleanCnpj = cnpj.replaceAll(RegExp(r'\D'), '');
+
       final response = await ApiClient.post(
         '/empresa',
         token: token,
@@ -21,7 +23,7 @@ class EmpresaService {
           'razaoSocial': razaoSocial,
           if (nomeFantasia != null && nomeFantasia.isNotEmpty)
             'nomeFantasia': nomeFantasia,
-          'cnpj': cnpj,
+          'cnpj': cleanCnpj,
           'emailContato': emailContato,
           if (telefone != null && telefone.isNotEmpty) 'telefone': telefone,
           'cidade': cidade,
@@ -99,6 +101,9 @@ class EmpresaService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        if (data is Map && data.containsKey('dados') && data['dados'] is List) {
+          return {'success': true, 'data': data['dados']};
+        }
         return {'success': true, 'data': data is List ? data : [data]};
       }
       return {'success': false, 'message': _extractError(response.body)};
@@ -122,6 +127,9 @@ class EmpresaService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        if (data is Map && data.containsKey('dados') && data['dados'] is List) {
+          return {'success': true, 'data': data['dados']};
+        }
         return {'success': true, 'data': data is List ? data : []};
       }
       return {'success': false, 'message': _extractError(response.body)};

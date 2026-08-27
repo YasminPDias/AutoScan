@@ -65,7 +65,7 @@ class DesktopLayout extends StatelessWidget {
                 title: Text(title),
               )
             : null,
-        drawer: const AppDrawer(),
+        drawer: AppDrawer(currentRoute: currentRoute),
         body: child,
       );
     }

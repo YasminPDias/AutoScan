@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:math';
+import 'package:flutter/services.dart';
 import '../../theme/app_colors.dart';
 import '../../layouts/desktop_layout.dart';
 import '../../utils/responsive.dart';
@@ -88,6 +90,27 @@ class _UsersScreenState extends State<UsersScreen> {
     final telefoneCtrl = TextEditingController();
     String funcaoSelecionada = funcaoPadrao;
     bool enviando = false;
+    bool senhaVisivel = false;
+
+    // Gerar senha inicial temporária
+    void gerarSenha() {
+      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#';
+      final rand = Random.secure();
+      final senha = List.generate(10, (_) => chars[rand.nextInt(chars.length)]).join();
+      senhaCtrl.text = senha;
+    }
+
+    gerarSenha(); // Executa para criar a senha inicial
+
+    void copiarSenha(BuildContext ctx) {
+      Clipboard.setData(ClipboardData(text: senhaCtrl.text));
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        const SnackBar(
+          content: Text('Senha copiada para a área de transferência'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
 
     showDialog(
       context: context,
@@ -134,10 +157,30 @@ class _UsersScreenState extends State<UsersScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: senhaCtrl,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Senha *',
-                        prefixIcon: Icon(Icons.lock),
+                      obscureText: !senhaVisivel,
+                      decoration: InputDecoration(
+                        labelText: 'Senha Temporária *',
+                        prefixIcon: const Icon(Icons.lock),
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(senhaVisivel ? Icons.visibility_off : Icons.visibility),
+                              onPressed: () => setModalState(() => senhaVisivel = !senhaVisivel),
+                              tooltip: 'Mostrar/ocultar senha',
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.copy),
+                              onPressed: () => copiarSenha(context),
+                              tooltip: 'Copiar senha',
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.refresh),
+                              onPressed: () => setModalState(gerarSenha),
+                              tooltip: 'Gerar nova senha',
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -164,6 +207,12 @@ class _UsersScreenState extends State<UsersScreen> {
                       onChanged: (val) {
                         if (val != null) setModalState(() => funcaoSelecionada = val);
                       },
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Copie a senha antes de salvar — ela não será mostrada novamente.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
@@ -309,15 +358,7 @@ class _UsersScreenState extends State<UsersScreen> {
                         prefixIcon: Icon(Icons.email),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: senhaCtrl,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Nova Senha *',
-                        prefixIcon: Icon(Icons.lock),
-                      ),
-                    ),
+
                     const SizedBox(height: 12),
                     TextField(
                       controller: telefoneCtrl,
@@ -359,7 +400,6 @@ class _UsersScreenState extends State<UsersScreen> {
                         if (nomeCtrl.text.trim().isEmpty ||
                             sobrenomeCtrl.text.trim().isEmpty ||
                             emailCtrl.text.trim().isEmpty ||
-                            senhaCtrl.text.trim().isEmpty ||
                             telefoneCtrl.text.trim().isEmpty) {
                           ScaffoldMessenger.of(ctx).showSnackBar(
                             const SnackBar(
@@ -669,26 +709,39 @@ class _UsersScreenState extends State<UsersScreen> {
                                   ),
                                 ),
                               ),
-                              title: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
+                              title: context.isDesktop
+                                  ? Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            nome.isNotEmpty ? nome : 'Sem Nome',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        _buildRoleBadge(funcao.toString()),
+                                      ],
+                                    )
+                                  : Text(
                                       nome.isNotEmpty ? nome : 'Sem Nome',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 16,
+                                        fontSize: 15,
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _buildRoleBadge(funcao.toString()),
-                                ],
-                              ),
                               subtitle: Padding(
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    if (!context.isDesktop) ...[
+                                      const SizedBox(height: 2),
+                                      _buildRoleBadge(funcao.toString()),
+                                      const SizedBox(height: 6),
+                                    ],
                                     Text('E-mail: $email', style: const TextStyle(fontSize: 13)),
                                     if (telefone.isNotEmpty)
                                       Text('Telefone: $telefone', style: const TextStyle(fontSize: 13)),

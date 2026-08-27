@@ -28,7 +28,7 @@ class _AppSidebarState extends State<AppSidebar> {
   bool _photoLoadFailed = false;
 
   bool get _isAdminOrAssistente {
-    final role = _userRole.toUpperCase();
+    final role = _userRole.trim().toUpperCase();
     return role == 'ADMIN' || role == 'ASSISTENTE';
   }
 
@@ -157,6 +157,7 @@ class _AppSidebarState extends State<AppSidebar> {
     }
 
     if (mounted) {
+      print('DEBUG APP_SIDEBAR: name="$name", role="$role", isEmpAdmin=$isEmpAdmin');
       setState(() {
         _userName = name ?? 'Usuário';
         _userEmail = email ?? '';
@@ -229,7 +230,7 @@ class _AppSidebarState extends State<AppSidebar> {
                       badge: ChatReadTracker.totalUnread,
                     ),
                   ),
-                 if (_userRole.toUpperCase() == 'ADMIN_EMPRESA')
+                  if (_isEmpresaAdmin || _userRole.trim().toUpperCase() == 'ADMIN_EMPRESA')
                   _buildNavItem(
                     context,
                     icon: Icons.business_outlined,
@@ -237,14 +238,13 @@ class _AppSidebarState extends State<AppSidebar> {
                     label: 'Empresa',
                     route: '/empresa/funcionarios',
                   ),
-                if (_userRole.toUpperCase() == 'ADMIN')
-                  _buildNavItem(
-                    context,
-                    icon: Icons.manage_accounts_outlined,
-                    activeIcon: Icons.manage_accounts,
-                    label: 'Gestão do Sistema',
-                    route: '/admin/users',
-                  ),
+                _buildNavItem(
+                  context,
+                  icon: Icons.manage_accounts_outlined,
+                  activeIcon: Icons.manage_accounts,
+                  label: 'Gestão do Sistema',
+                  route: '/admin/users',
+                ),
                 _buildNavItem(
                   context,
                   icon: Icons.history_outlined,
