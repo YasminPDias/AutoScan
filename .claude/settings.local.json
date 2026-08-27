@@ -4,7 +4,8 @@
       "Bash(flutter pub:*)",
       "Bash(flutter analyze:*)",
       "WebFetch(domain:sassoficina-gfb6gwfphefacta6.canadacentral-01.azurewebsites.net)",
-      "Bash(dir \"c:\\\\Users\\\\yasmi\\\\OneDrive\\\\Documentos\\\\Autex prototipo\" /b)"
+      "Bash(dir \"c:\\\\Users\\\\yasmi\\\\OneDrive\\\\Documentos\\\\Autex prototipo\" /b)",
+      "Bash(cd /c/Users/Alisson/Desktop/oficinaV8 && ls -la)"
     ]
   }
 }

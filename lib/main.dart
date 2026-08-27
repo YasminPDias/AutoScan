@@ -15,6 +15,7 @@ import 'screens/history/history_screen.dart';
 import 'screens/diagnostic/diagnostic_screen.dart';
 import 'screens/diagnostic/diagnostic_result_screen.dart';
 import 'screens/plans/plans_screen.dart';
+import 'screens/payment/payment_screen.dart';
 import 'screens/chat/chat_screen.dart';
 import 'screens/chat/chat_history_screen.dart';
 import 'screens/empresa/criar_empresa_screen.dart';
@@ -40,8 +41,7 @@ void main() async {
     final token = await AuthStorage.getToken();
     if (token != null) {
       socketService.conectar(token);
-      // Inicializa o serviço de push em segundo plano para não travar a inicialização do app
-      pushService.inicializar();
+      await pushService.inicializar();
       await ChatReadTracker.carregarDaApi(token);
     }
   }
@@ -85,6 +85,7 @@ class AutexApp extends StatelessWidget {
         '/diagnostic': (context) => const DiagnosticScreen(),
         '/diagnostic-result': (context) => const DiagnosticResultScreen(),
         '/plans': (context) => const PlansScreen(),
+        '/pagamento': (context) => const PaymentScreen(),
         '/chat': (context) => const ChatScreen(),
         '/chat-history': (context) => const ChatHistoryScreen(),
         '/change-password': (context) => const ChangePasswordScreen(),

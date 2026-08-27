@@ -73,11 +73,8 @@ class _CriarEmpresaScreenState extends State<CriarEmpresaScreen> {
     if (result['success'] == true) {
       final empresaId = (result['data'] as Map<String, dynamic>)['id']?.toString();
 
-      // por enquanto usa o endpoint de teste pra ativar sem pagamento
-      // TODO: substituir pelo fluxo de pagamento Stripe quando implementado
       if (empresaId != null) {
         await AuthStorage.saveUser(isEmpresaAdmin: true);
-        await EmpresaService.ativarTeste(token: token, empresaId: empresaId);
       }
 
       if (!mounted) return;
@@ -89,11 +86,15 @@ class _CriarEmpresaScreenState extends State<CriarEmpresaScreen> {
         ),
       );
 
-      // navega pra tela de funcionários
+      // segue pro pagamento pra ativar a assinatura da empresa
       Navigator.pushReplacementNamed(
         context,
-        '/empresa/funcionarios',
-        arguments: {'empresaId': empresaId},
+        '/pagamento',
+        arguments: {
+          'planoId': _planoId,
+          'planoNome': _planoNome,
+          'empresaId': empresaId,
+        },
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

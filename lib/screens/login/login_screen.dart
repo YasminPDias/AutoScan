@@ -268,8 +268,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (token.isNotEmpty) {
           socketService.conectar(token);
-          // Inicializa o serviço de push em segundo plano para não bloquear o login
-          pushService.inicializar();
+          await pushService.inicializar();
         }
 
         if (!mounted) return;
