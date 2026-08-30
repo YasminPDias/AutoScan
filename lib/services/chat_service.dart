@@ -182,12 +182,13 @@ class ChatService {
 
   static Future<Map<String, dynamic>> buscarConversasDisponiveis({
     required String token,
+    String tipo = 'DIAGNOSTICO',
     int pagina = 1,
     int porPagina = 20,
   }) async {
     try {
       final response = await ApiClient.get(
-        '/conversas/disponiveis?pagina=$pagina&porPagina=$porPagina',
+        '/conversas/disponiveis?tipo=$tipo&pagina=$pagina&porPagina=$porPagina',
         token: token,
       );
       if (response.statusCode == 200) {

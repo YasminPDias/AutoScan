@@ -474,6 +474,8 @@ class _HomeScreenState extends State<HomeScreen> {
           childAspectRatio: 3.4,
           children: [
             _buildEnhancedFeatureCard(icon: Icons.analytics_outlined, title: 'Diagnóstico Inteligente', description: 'Análise completa e precisa do seu veículo', color: AppColors.primaryRed, onTap: () => Navigator.pushNamed(context, '/diagnostic')),
+            if (_userRole.trim().toUpperCase() != 'ADMIN' && _userRole.trim().toUpperCase() != 'ASSISTENTE')
+              _buildEnhancedFeatureCard(icon: Icons.electrical_services_outlined, title: 'Esquema Elétrico', description: 'Solicite o diagrama do veículo', color: const Color(0xFFFF8F00), onTap: () => Navigator.pushNamed(context, '/minhas-solicitacoes')),
             _buildEnhancedFeatureCard(icon: Icons.chat_bubble_outline, title: 'Chat com Especialista', description: 'Tire dúvidas com IA e mecânicos', color: const Color(0xFF1976D2), onTap: () => Navigator.pushNamed(context, '/history')),
             _buildEnhancedFeatureCard(icon: Icons.description_outlined, title: 'Planos e Assinaturas', description: 'Conheça nossos planos', color: const Color(0xFF388E3C), onTap: () => Navigator.pushNamed(context, '/plans')),
             _buildEnhancedFeatureCard(icon: Icons.history, title: 'Histórico Completo', description: 'Acesse todos os diagnósticos', color: const Color(0xFFE64A19), onTap: () => Navigator.pushNamed(context, '/history')),
@@ -558,6 +560,15 @@ class _HomeScreenState extends State<HomeScreen> {
           description: 'Análise completa e precisa do seu veículo com tecnologia avançada',
           onTap: () => Navigator.pushNamed(context, '/diagnostic'),
         ),
+        if (_userRole.trim().toUpperCase() != 'ADMIN' && _userRole.trim().toUpperCase() != 'ASSISTENTE') ...[
+          const SizedBox(height: 20),
+          FeatureCard(
+            icon: Icons.electrical_services_outlined,
+            title: 'Esquema Elétrico',
+            description: 'Solicite o diagrama ou esquema elétrico do veículo',
+            onTap: () => Navigator.pushNamed(context, '/minhas-solicitacoes'),
+          ),
+        ],
         const SizedBox(height: 20),
         FeatureCard(
           icon: Icons.chat_bubble_outline,

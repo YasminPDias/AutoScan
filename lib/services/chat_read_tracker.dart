@@ -17,6 +17,22 @@ class ChatReadTracker {
   // conversaId -> quantidade de mensagens não lidas
   static final Map<String, int> _naoLidas = {};
 
+  // Conversas que foram lidas pelo usuário na sessão atual para evitar
+  // que estados desatualizados do backend as marquem como não lidas de novo
+  static final Set<String> _lidasNaSessao = {};
+
+  // ID da conversa que o usuário está visualizando no momento.
+  // Impede que eventos em tempo real marquem a conversa ativa como não lida.
+  static String? _conversaAbertaId;
+
+  /// Define qual conversa está aberta na tela do usuário.
+  static void setConversaAberta(String? conversaId) {
+    _conversaAbertaId = conversaId;
+    if (conversaId != null) {
+      markRead(conversaId);
+    }
+  }
+
   /// Escuta esse notifier pra reconstruir automaticamente quando o badge muda.
   /// Valor = total de conversas com pelo menos uma mensagem não lida.
   static final ValueNotifier<int> notifier = ValueNotifier<int>(0);
@@ -51,6 +67,10 @@ class ChatReadTracker {
           ) ??
           0;
       if (id != null && count > 0) {
+        // Se a conversa foi lida nesta sessão ou está aberta no momento, ignora o estado desatualizado do backend
+        if (_lidasNaSessao.contains(id) || _conversaAbertaId == id) {
+          continue;
+        }
         _naoLidas[id] = count;
       }
     }
@@ -60,13 +80,28 @@ class ChatReadTracker {
   /// Chamado quando chega evento de socket (nova mensagem ou novo chamado) —
   /// incrementa sem precisar rebater na API.
   static void incrementar(String conversaId) {
+    // Se a conversa está aberta pelo usuário neste exato momento, não faz nada
+    if (_conversaAbertaId == conversaId) {
+      return;
+    }
+    // Nova mensagem recebida anula a leitura da sessão para esta conversa
+    _lidasNaSessao.remove(conversaId);
     _naoLidas[conversaId] = (_naoLidas[conversaId] ?? 0) + 1;
     _notificar();
   }
 
   /// Chamado ao abrir uma conversa — zera localmente na hora (UX imediata).
   static void markRead(String conversaId) {
+    _lidasNaSessao.add(conversaId);
     _naoLidas.remove(conversaId);
+    _notificar();
+  }
+
+  /// Mantém apenas as contagens das conversas ativas/disponíveis fornecidas.
+  static void manterApenas(Set<String> ids) {
+    _naoLidas.removeWhere((key, _) => !ids.contains(key));
+    // Limpa também do cache de lidas da sessão para não crescer indefinidamente
+    _lidasNaSessao.removeWhere((id) => !ids.contains(id));
     _notificar();
   }
 

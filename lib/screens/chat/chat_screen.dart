@@ -22,6 +22,7 @@ import '../../services/atendimento_service.dart';
 import '../../services/audio_player_controller.dart';
 import '../../models/mensagem_model.dart';
 import '../../widgets/chat_midia_widgets.dart';
+import '../../services/esquema_service.dart';
 
 const _uuid = Uuid();
 
@@ -219,14 +220,47 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     _conversaId = conversaId;
-    ChatReadTracker.markRead(conversaId);
+    ChatReadTracker.setConversaAberta(conversaId);
 
-    final convResult =
+    // Se o argumento 'disponivel' for passado como true, somos atendentes abrindo
+    // um chamado disponível pela primeira vez. Tentamos reivindicar antes de buscar.
+    final isDisponivel = args?['disponivel'] == true;
+
+    if (isDisponivel) {
+      final role = await AuthStorage.getUserRole();
+      final normalizedRole = role?.trim().toUpperCase() ?? '';
+      final isAtendente = normalizedRole == 'ADMIN' || normalizedRole == 'ASSISTENTE';
+      if (isAtendente) {
+        // Como o atendente clicou no card disponível de Esquema Elétrico, reivindica
+        await ChatService.reivindicarConversa(token: _token!, conversaId: conversaId);
+      }
+    }
+
+    var convResult =
         await ChatService.buscarConversa(token: _token!, conversaId: conversaId);
 
     if (!mounted) return;
 
-    // 403 agora acontece de verdade — assertParticipante no backend.
+    // Se der 403 (e não foi reivindicado acima por falta da flag), verificamos se é
+    // do tipo ESQUEMA_ELETRICO. Se for, o atendente assume automaticamente (fallback URL/Push).
+    if (convResult['statusCode'] == 403) {
+      final role = await AuthStorage.getUserRole();
+      final normalizedRole = role?.trim().toUpperCase() ?? '';
+      final isAtendente = normalizedRole == 'ADMIN' || normalizedRole == 'ASSISTENTE';
+
+      if (isAtendente) {
+        // Tenta obter os detalhes da solicitação de esquema elétrico. Se for sucesso, sabemos que é do tipo ESQUEMA_ELETRICO.
+        final esqDet = await EsquemaService.obterDetalhe(token: _token!, conversaId: conversaId);
+        if (esqDet['success'] == true) {
+          final claimRes = await ChatService.reivindicarConversa(token: _token!, conversaId: conversaId);
+          if (claimRes['success'] == true) {
+            convResult = await ChatService.buscarConversa(token: _token!, conversaId: conversaId);
+            if (!mounted) return;
+          }
+        }
+      }
+    }
+
     if (convResult['statusCode'] == 403) {
       setState(() {
         _isLoading = false;
@@ -237,10 +271,29 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (convResult['success'] == true) {
       final data = convResult['data'] as Map<String, dynamic>;
+      final status = data['status']?.toString() ?? '';
+      final atendenteId = data['atendenteId']?.toString();
+      final tipo = data['tipo']?.toString()?.toUpperCase() ?? '';
+
       setState(() {
-        _conversaStatus = data['status']?.toString() ?? '';
+        _conversaStatus = status;
         _clienteId = data['clienteId']?.toString();
       });
+
+      // Se for atendente e o status de ESQUEMA_ELETRICO ainda estiver aguardando/pendente ou sem atendente atribuído
+      final role = await AuthStorage.getUserRole();
+      final normalizedRole = role?.trim().toUpperCase() ?? '';
+      final isAtendente = normalizedRole == 'ADMIN' || normalizedRole == 'ASSISTENTE';
+
+      if (isAtendente && tipo == 'ESQUEMA_ELETRICO' && (status == 'AGUARDANDO' || status == 'PENDENTE' || atendenteId == null || atendenteId.isEmpty)) {
+        final claimRes = await ChatService.reivindicarConversa(token: _token!, conversaId: conversaId);
+        if (claimRes['success'] == true && mounted) {
+          setState(() {
+            _conversaStatus = 'EM_ATENDIMENTO';
+          });
+          ChatReadTracker.markRead(conversaId);
+        }
+      }
     }
 
     final atResult =
@@ -859,6 +912,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (result['success'] == true) {
       setState(() => _conversaStatus = 'ENCERRADA');
+      ChatReadTracker.markRead(_conversaId!);
     } else {
       _mostrarErro(
           result['message']?.toString() ?? 'Erro ao encerrar conversa.');
@@ -1494,6 +1548,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    ChatReadTracker.setConversaAberta(null);
     _scrollController.removeListener(_onScroll);
     _realtimeService.stop();
     _messageController.dispose();

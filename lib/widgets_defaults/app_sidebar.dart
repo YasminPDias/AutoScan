@@ -210,6 +210,14 @@ class _AppSidebarState extends State<AppSidebar> {
                   label: 'Diagnóstico',
                   route: '/diagnostic',
                 ),
+                if (!_isAdminOrAssistente)
+                  _buildNavItem(
+                    context,
+                    icon: Icons.electrical_services_outlined,
+                    activeIcon: Icons.electrical_services,
+                    label: 'Esquema Elétrico',
+                    route: '/minhas-solicitacoes',
+                  ),
                 if (widget.currentRoute == '/chat')
                   _buildNavItem(
                     context,
@@ -221,14 +229,38 @@ class _AppSidebarState extends State<AppSidebar> {
                 if (_isAdminOrAssistente)
                   ValueListenableBuilder<int>(
                     valueListenable: ChatReadTracker.notifier,
-                    builder: (context, _, __) => _buildNavItem(
-                      context,
-                      icon: Icons.support_agent_outlined,
-                      activeIcon: Icons.support_agent,
-                      label: 'Atendimentos',
-                      route: '/chat-history',
-                      badge: ChatReadTracker.totalUnread,
-                    ),
+                    builder: (context, _, __) {
+                      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+                      final tipoArg = args?['tipo']?.toString();
+                      final isHistory = widget.currentRoute == '/chat-history';
+                      final isDiagAtendimento = isHistory && tipoArg != 'ESQUEMA_ELETRICO';
+                      final isEsqAtendimento = isHistory && tipoArg == 'ESQUEMA_ELETRICO';
+
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildNavItem(
+                            context,
+                            icon: Icons.support_agent_outlined,
+                            activeIcon: Icons.support_agent,
+                            label: 'Atend. Diagnósticos',
+                            route: '/chat-history',
+                            arguments: const {'tipo': 'DIAGNOSTICO'},
+                            isSelected: isDiagAtendimento,
+                            badge: ChatReadTracker.totalUnread,
+                          ),
+                          _buildNavItem(
+                            context,
+                            icon: Icons.electrical_services_outlined,
+                            activeIcon: Icons.electrical_services,
+                            label: 'Atend. Esquemas',
+                            route: '/chat-history',
+                            arguments: const {'tipo': 'ESQUEMA_ELETRICO'},
+                            isSelected: isEsqAtendimento,
+                          ),
+                        ],
+                      );
+                    },
                   ),
                   if (_isEmpresaAdmin || _userRole.trim().toUpperCase() == 'ADMIN_EMPRESA')
                   _buildNavItem(
@@ -325,9 +357,11 @@ class _AppSidebarState extends State<AppSidebar> {
     required IconData activeIcon,
     required String label,
     required String route,
+    Object? arguments,
+    bool? isSelected,
     int badge = 0,
   }) {
-    final isActive = widget.currentRoute == route;
+    final active = isSelected ?? (widget.currentRoute == route);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -335,8 +369,8 @@ class _AppSidebarState extends State<AppSidebar> {
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            if (!isActive) {
-              Navigator.pushReplacementNamed(context, route);
+            if (!active) {
+              Navigator.pushReplacementNamed(context, route, arguments: arguments);
             }
           },
           borderRadius: BorderRadius.circular(8),
@@ -344,15 +378,15 @@ class _AppSidebarState extends State<AppSidebar> {
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             decoration: BoxDecoration(
-              color: isActive ? AppColors.lightRed : Colors.transparent,
+              color: active ? AppColors.lightRed : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               children: [
                 Icon(
-                  isActive ? activeIcon : icon,
+                  active ? activeIcon : icon,
                   size: 22,
-                  color: isActive
+                  color: active
                       ? AppColors.primaryRed
                       : AppColors.textSecondary,
                 ),
@@ -362,10 +396,10 @@ class _AppSidebarState extends State<AppSidebar> {
                     label,
                     style: TextStyle(
                       fontSize: 15,
-                      fontWeight: isActive
+                      fontWeight: active
                           ? FontWeight.w600
                           : FontWeight.normal,
-                      color: isActive
+                      color: active
                           ? AppColors.primaryRed
                           : AppColors.textPrimary,
                     ),

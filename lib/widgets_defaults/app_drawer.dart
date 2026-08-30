@@ -243,6 +243,15 @@ class _AppDrawerState extends State<AppDrawer> {
                     Navigator.pushReplacementNamed(context, '/diagnostic');
                   },
                 ),
+                if (!_isAdminOrAssistente)
+                  ListTile(
+                    leading: const Icon(Icons.electrical_services_outlined),
+                    title: const Text('Esquema Elétrico'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushReplacementNamed(context, '/minhas-solicitacoes');
+                    },
+                  ),
                 if (widget.currentRoute == '/chat')
                   ListTile(
                     leading: const Icon(Icons.chat_bubble_outline),
@@ -252,7 +261,7 @@ class _AppDrawerState extends State<AppDrawer> {
                       Navigator.pushReplacementNamed(context, '/chat');
                     },
                   ),
-                if (_isAdminOrAssistente)
+                if (_isAdminOrAssistente) ...[
                   ValueListenableBuilder<int>(
                     valueListenable: ChatReadTracker.notifier,
                     builder: (context, totalUnread, _) {
@@ -260,7 +269,7 @@ class _AppDrawerState extends State<AppDrawer> {
                         leading: const Icon(Icons.support_agent),
                         title: Row(
                           children: [
-                            const Text('Atendimentos'),
+                            const Text('Atend. Diagnósticos'),
                             if (totalUnread > 0) ...[
                               const SizedBox(width: 8),
                               Container(
@@ -283,11 +292,28 @@ class _AppDrawerState extends State<AppDrawer> {
                         ),
                         onTap: () {
                           Navigator.pop(context);
-                          Navigator.pushReplacementNamed(context, '/chat-history');
+                          Navigator.pushReplacementNamed(
+                            context,
+                            '/chat-history',
+                            arguments: const {'tipo': 'DIAGNOSTICO'},
+                          );
                         },
                       );
                     },
                   ),
+                  ListTile(
+                    leading: const Icon(Icons.electrical_services),
+                    title: const Text('Atend. Esquemas'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushReplacementNamed(
+                        context,
+                        '/chat-history',
+                        arguments: const {'tipo': 'ESQUEMA_ELETRICO'},
+                      );
+                    },
+                  ),
+                ],
                 if (_isEmpresaAdmin || _userRole.trim().toUpperCase() == 'ADMIN_EMPRESA')
                   ListTile(
                     leading: const Icon(Icons.business),
