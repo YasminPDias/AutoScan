@@ -7,6 +7,7 @@ import '../../services/auth_storage.dart';
 import '../../services/socket_service.dart';
 import '../../services/push_service.dart';
 import '../../services/empresa/empresa_service.dart';
+import '../../services/chat_read_tracker.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -269,6 +270,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (token.isNotEmpty) {
           socketService.conectar(token);
           await pushService.inicializar();
+          await ChatReadTracker.carregarDaApi(token);
         }
 
         if (!mounted) return;

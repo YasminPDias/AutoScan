@@ -39,7 +39,7 @@ class SocketService {
     _socket = IO.io(
       ApiConfig.wsUrl,
       IO.OptionBuilder()
-          .setTransports(['websocket'])
+          .setTransports(['websocket', 'polling'])
           .setPath('/chatws')
           .setAuth({'token': token})
           .enableForceNew()

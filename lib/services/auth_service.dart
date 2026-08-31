@@ -6,6 +6,7 @@ import 'auth_storage.dart';
 import 'logger_service.dart';
 import 'push_service.dart';
 import 'socket_service.dart';
+import 'chat_read_tracker.dart';
 
 class AuthService {
   static String _pickString(Map<String, dynamic> source, List<String> keys) {
@@ -582,6 +583,7 @@ class AuthService {
 
     await pushService.desregistrar(); // precisa do token ainda válido
     socketService.desconectar();
+    ChatReadTracker.limpar();
     await AuthStorage.clear();
 
     if (context.mounted) {

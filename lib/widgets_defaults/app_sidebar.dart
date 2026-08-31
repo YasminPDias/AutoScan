@@ -32,6 +32,13 @@ class _AppSidebarState extends State<AppSidebar> {
     return role == 'ADMIN' || role == 'ASSISTENTE';
   }
 
+  bool get _deveExibirAtendimentos {
+    final role = _userRole.trim().toUpperCase();
+    if (role == 'ASSISTENTE') return true;
+    if (role == 'ADMIN') return ChatReadTracker.temMeusAtendimentos;
+    return false;
+  }
+
   Uint8List? _decodePhotoBytes(String rawPhoto) {
     try {
       final normalized = rawPhoto.trim();
@@ -121,15 +128,21 @@ class _AppSidebarState extends State<AppSidebar> {
     super.initState();
     _loadUserData();
 
-    // quando chega um novo chamado via socket, incrementa o badge —
-    // o ValueListenableBuilder no build reconstrói automaticamente
     socketService.onNovoChamado = (data) {
       final conversaId = data['conversaId']?.toString();
-      if (conversaId != null) ChatReadTracker.incrementar(conversaId);
+      final tipo = data['tipo']?.toString();
+      if (conversaId != null) {
+        if (tipo != null) ChatReadTracker.registrarTipo(conversaId, tipo);
+        ChatReadTracker.incrementar(conversaId);
+      }
     };
     socketService.onChamadoDisponivel = (data) {
       final conversaId = data['conversaId']?.toString();
-      if (conversaId != null) ChatReadTracker.incrementar(conversaId);
+      final tipo = data['tipo']?.toString();
+      if (conversaId != null) {
+        if (tipo != null) ChatReadTracker.registrarTipo(conversaId, tipo);
+        ChatReadTracker.incrementar(conversaId);
+      }
     };
   }
 
@@ -226,7 +239,7 @@ class _AppSidebarState extends State<AppSidebar> {
                     label: 'Chat',
                     route: '/chat',
                   ),
-                if (_isAdminOrAssistente)
+                if (_deveExibirAtendimentos)
                   ValueListenableBuilder<int>(
                     valueListenable: ChatReadTracker.notifier,
                     builder: (context, _, __) {
@@ -239,7 +252,7 @@ class _AppSidebarState extends State<AppSidebar> {
                       return Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _buildNavItem(
+                           _buildNavItem(
                             context,
                             icon: Icons.support_agent_outlined,
                             activeIcon: Icons.support_agent,
@@ -247,7 +260,7 @@ class _AppSidebarState extends State<AppSidebar> {
                             route: '/chat-history',
                             arguments: const {'tipo': 'DIAGNOSTICO'},
                             isSelected: isDiagAtendimento,
-                            badge: ChatReadTracker.totalUnread,
+                            badge: ChatReadTracker.totalDiagnosticoUnread,
                           ),
                           _buildNavItem(
                             context,
@@ -257,6 +270,7 @@ class _AppSidebarState extends State<AppSidebar> {
                             route: '/chat-history',
                             arguments: const {'tipo': 'ESQUEMA_ELETRICO'},
                             isSelected: isEsqAtendimento,
+                            badge: ChatReadTracker.totalEsquemaUnread,
                           ),
                         ],
                       );
@@ -270,13 +284,14 @@ class _AppSidebarState extends State<AppSidebar> {
                     label: 'Empresa',
                     route: '/empresa/funcionarios',
                   ),
-                _buildNavItem(
-                  context,
-                  icon: Icons.manage_accounts_outlined,
-                  activeIcon: Icons.manage_accounts,
-                  label: 'Gestão do Sistema',
-                  route: '/admin/users',
-                ),
+                if (_userRole.trim().toUpperCase() == 'ADMIN')
+                  _buildNavItem(
+                    context,
+                    icon: Icons.manage_accounts_outlined,
+                    activeIcon: Icons.manage_accounts,
+                    label: 'Gestão do Sistema',
+                    route: '/admin/users',
+                  ),
                 _buildNavItem(
                   context,
                   icon: Icons.history_outlined,

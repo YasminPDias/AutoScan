@@ -524,7 +524,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   trailing: Switch(
                     value: _notificationsEnabled,
                     onChanged: _alternarNotificacoes,
-                    activeColor: AppColors.primaryRed,
+                    activeThumbColor: AppColors.primaryRed,
                   ),
                 ),
                 _buildSettingItem(
@@ -539,13 +539,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   icon: Icons.help,
                   title: 'Ajuda e Suporte',
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
+                  onTap: () => _mostrarDialogoAjudaSuporte(context),
                 ),
                 _buildSettingItem(
                   icon: Icons.info,
                   title: 'Sobre o App',
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
+                  onTap: () => _mostrarDialogoSobreApp(context),
                 ),
               ],
             ),
@@ -722,7 +722,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   trailing: Switch(
                     value: _notificationsEnabled,
                     onChanged: _alternarNotificacoes,
-                    activeColor: AppColors.primaryRed,
+                    activeThumbColor: AppColors.primaryRed,
                   ),
                 ),
                 _buildSettingItem(
@@ -737,13 +737,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   icon: Icons.help,
                   title: 'Ajuda e Suporte',
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
+                  onTap: () => _mostrarDialogoAjudaSuporte(context),
                 ),
                 _buildSettingItem(
                   icon: Icons.info,
                   title: 'Sobre o App',
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
+                  onTap: () => _mostrarDialogoSobreApp(context),
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
@@ -830,6 +830,276 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         trailing: trailing,
         onTap: onTap,
+      ),
+    );
+  }
+
+  void _mostrarDialogoAjudaSuporte(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryRed.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.help_outline, color: AppColors.primaryRed, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Ajuda & Suporte Técnico',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      ),
+                      Text(
+                        'Tire suas dúvidas ou fale com nossa equipe',
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Perguntas Frequentes (FAQ)',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      ),
+                      const SizedBox(height: 10),
+                      _buildFaqItem(
+                        pergunta: 'Como solicitar um diagnóstico via IA?',
+                        resposta: 'Acesse a aba "Diagnóstico Inteligente" na tela inicial, informe o código OBD2, os dados do veículo e os sintomas. A inteligência artificial irá gerar a análise em instantes.',
+                      ),
+                      _buildFaqItem(
+                        pergunta: 'Como funciona o Suporte a Esquema Elétrico?',
+                        resposta: 'Nossos clientes e oficinas parceiras podem solicitar diagramas elétricos automotivos pelo menu "Suporte a Esquema Elétrico". Nossos especialistas analisam e disponibilizam o diagrama no chat.',
+                      ),
+                      _buildFaqItem(
+                        pergunta: 'Como falar com um assistente ou mecânico?',
+                        resposta: 'Após realizar um diagnóstico ou solicitar um esquema elétrico, o chamado fica aberto e nossa equipe técnica assume o atendimento via chat para tirar todas as dúvidas.',
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Canais de Contato',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Column(
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.email_outlined, size: 20, color: AppColors.primaryRed),
+                                SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('E-mail de Suporte', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                    Text('suporte@autex.app.br', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 24),
+                            const Row(
+                              children: [
+                                Icon(Icons.access_time, size: 20, color: AppColors.primaryRed),
+                                SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Horário de Atendimento', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                    Text('Seg. a Sex. 08h às 18h | Sáb. 08h às 12h', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryRed,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Fechar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _mostrarDialogoSobreApp(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 480),
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  padding: const EdgeInsets.all(12),
+                  decoration: const BoxDecoration(
+                    color: AppColors.lightRed,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Image.asset('lib/assets/Logo Autex.png', fit: BoxFit.contain),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'AutoScan',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryRed.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'Versão 1.5.0 (Build 2026.1)',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryRed),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'O AutoScan é a plataforma completa para diagnósticos veiculares inteligentes, integração de inteligência artificial com códigos OBD2 e solicitação de esquemas elétricos automotivos.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+                ),
+                const SizedBox(height: 20),
+                const Divider(),
+                const SizedBox(height: 12),
+                _buildSobreRecurso(Icons.psychology_outlined, 'IA de Diagnóstico OBD2 Avançada'),
+                _buildSobreRecurso(Icons.electrical_services_outlined, 'Diagramas e Esquemas Elétricos'),
+                _buildSobreRecurso(Icons.support_agent_outlined, 'Suporte Técnico em Tempo Real'),
+                const SizedBox(height: 20),
+                const Text(
+                  '© 2026 AutoScan / Autex. Todos os direitos reservados.',
+                  style: TextStyle(fontSize: 11, color: AppColors.textLight),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryRed,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('OK', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFaqItem({required String pergunta, required String resposta}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: ExpansionTile(
+        title: Text(
+          pergunta,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            child: Text(
+              resposta,
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSobreRecurso(IconData icon, String texto) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: AppColors.primaryRed),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              texto,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+            ),
+          ),
+        ],
       ),
     );
   }

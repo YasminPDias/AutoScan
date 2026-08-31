@@ -49,7 +49,10 @@ class ChatService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data is List) {
-          return {'success': true, 'data': data, 'pagina': 1, 'totalPaginas': 1};
+          final lista = data
+              .map((j) => ConversaModel.fromJson(j as Map<String, dynamic>))
+              .toList();
+          return {'success': true, 'data': lista, 'pagina': 1, 'totalPaginas': 1};
         }
         final lista = (data['dados'] as List? ?? [])
             .map((j) => ConversaModel.fromJson(j as Map<String, dynamic>))

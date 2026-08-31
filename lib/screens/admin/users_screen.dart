@@ -6,10 +6,8 @@ import '../../layouts/desktop_layout.dart';
 import '../../utils/responsive.dart';
 import '../../services/user_service.dart';
 import '../../services/auth_storage.dart';
-import '../../services/logger_service.dart';
 import '../../utils/validators.dart';
 import '../dashboard/dashboard_screen.dart';
-import '../empresa/empresa_funcionario_screen.dart';
 import 'gestao_empresas_tab.dart';
 
 class UsersScreen extends StatefulWidget {
@@ -35,11 +33,21 @@ class _UsersScreenState extends State<UsersScreen> {
   Future<void> _carregarUsuarios() async {
     setState(() => _isLoading = true);
     _token = await AuthStorage.getToken();
+    final role = await AuthStorage.getUserRole();
+    final userRole = role?.trim().toUpperCase() ?? '';
 
     if (_token == null || _token!.isEmpty) {
       if (mounted) {
         setState(() => _isLoading = false);
         Navigator.pushReplacementNamed(context, '/login');
+      }
+      return;
+    }
+
+    if (userRole != 'ADMIN') {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        Navigator.pushReplacementNamed(context, '/home');
       }
       return;
     }

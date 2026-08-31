@@ -5,7 +5,6 @@ import '../../utils/responsive.dart';
 import '../../services/auth_storage.dart';
 import '../../services/diagnostic_service.dart';
 import '../../services/logger_service.dart';
-import '../../widgets_defaults/feature_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -68,6 +67,19 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_userName.isEmpty) return 'Bem-vindo ao AutoScan';
     final firstName = _userName.split(' ').first.trim();
     return firstName.isEmpty ? 'Bem-vindo ao AutoScan' : 'Bem-vindo, $firstName';
+  }
+
+  void _abrirSuporteEsquema(BuildContext context) {
+    final role = _userRole.trim().toUpperCase();
+    if (role == 'ADMIN' || role == 'ASSISTENTE') {
+      Navigator.pushNamed(
+        context,
+        '/chat-history',
+        arguments: const {'tipo': 'ESQUEMA_ELETRICO'},
+      );
+    } else {
+      Navigator.pushNamed(context, '/minhas-solicitacoes');
+    }
   }
 
   void _abrirChatDoChamado(Map<String, dynamic> item) {
@@ -474,41 +486,25 @@ class _HomeScreenState extends State<HomeScreen> {
           childAspectRatio: 3.4,
           children: [
             _buildEnhancedFeatureCard(icon: Icons.analytics_outlined, title: 'Diagnóstico Inteligente', description: 'Análise completa e precisa do seu veículo', color: AppColors.primaryRed, onTap: () => Navigator.pushNamed(context, '/diagnostic')),
-            if (_userRole.trim().toUpperCase() != 'ADMIN' && _userRole.trim().toUpperCase() != 'ASSISTENTE')
-              _buildEnhancedFeatureCard(icon: Icons.electrical_services_outlined, title: 'Esquema Elétrico', description: 'Solicite o diagrama do veículo', color: const Color(0xFFFF8F00), onTap: () => Navigator.pushNamed(context, '/minhas-solicitacoes')),
-            _buildEnhancedFeatureCard(icon: Icons.chat_bubble_outline, title: 'Chat com Especialista', description: 'Tire dúvidas com IA e mecânicos', color: const Color(0xFF1976D2), onTap: () => Navigator.pushNamed(context, '/history')),
+            _buildEnhancedFeatureCard(icon: Icons.electrical_services_outlined, title: 'Suporte a Esquema Elétrico', description: 'Solicite diagramas ou suporte para esquema elétrico', color: const Color(0xFFFF8F00), onTap: () => _abrirSuporteEsquema(context)),
             _buildEnhancedFeatureCard(icon: Icons.description_outlined, title: 'Planos e Assinaturas', description: 'Conheça nossos planos', color: const Color(0xFF388E3C), onTap: () => Navigator.pushNamed(context, '/plans')),
             _buildEnhancedFeatureCard(icon: Icons.history, title: 'Histórico Completo', description: 'Acesse todos os diagnósticos', color: const Color(0xFFE64A19), onTap: () => Navigator.pushNamed(context, '/history')),
-            _buildEnhancedFeatureCard(
-              icon: Icons.trending_up,
-              title: 'Relatórios Detalhados',
-              description: 'Análises e estatísticas',
-              color: const Color(0xFF00796B),
-              onTap: () => Navigator.pushNamed(context, '/admin/users'),
-            ),
-            if (_userRole.trim().toUpperCase() == 'ADMIN' || _userRole.trim().toUpperCase() == 'ASSISTENTE')
+            if (_userRole.trim().toUpperCase() == 'ADMIN') ...[
               _buildEnhancedFeatureCard(
-                icon: Icons.support_agent_outlined,
-                title: 'Atendimentos',
-                description: 'Gerenciar chamados em aberto',
-                color: const Color(0xFF7B1FA2),
-                onTap: () => Navigator.pushNamed(context, '/chat-history'),
+                icon: Icons.trending_up,
+                title: 'Relatórios Detalhados',
+                description: 'Análises e estatísticas',
+                color: const Color(0xFF00796B),
+                onTap: () => Navigator.pushNamed(context, '/admin/users'),
               ),
-            if (_userRole.trim().toUpperCase() == 'ADMIN_EMPRESA')
               _buildEnhancedFeatureCard(
-                icon: Icons.business_outlined,
-                title: 'Minha Empresa',
-                description: 'Gerenciar funcionários e dados',
-                color: const Color(0xFF00897B),
-                onTap: () => Navigator.pushNamed(context, '/empresa/funcionarios'),
+                icon: Icons.manage_accounts_outlined,
+                title: 'Gestão do Sistema',
+                description: 'Painel administrativo',
+                color: const Color(0xFFE53935),
+                onTap: () => Navigator.pushNamed(context, '/admin/users'),
               ),
-            _buildEnhancedFeatureCard(
-              icon: Icons.manage_accounts_outlined,
-              title: 'Gestão do Sistema',
-              description: 'Painel administrativo',
-              color: const Color(0xFFE53935),
-              onTap: () => Navigator.pushNamed(context, '/admin/users'),
-            ),
+            ],
           ],
         ),
       ],
@@ -516,6 +512,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMobileLayout(BuildContext context) {
+    final role = _userRole.trim().toUpperCase();
+    final isAdmin = role == 'ADMIN';
+    final isAssistente = role == 'ASSISTENTE';
+    final isAdminEmpresa = role == 'ADMIN_EMPRESA';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -552,62 +553,75 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 24),
         _buildChamadosAbertosSection(context),
         const SizedBox(height: 24),
-        const Text('Recursos Principais', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+        Row(
+          children: [
+            Container(width: 4, height: 20, decoration: BoxDecoration(color: AppColors.primaryRed, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(width: 10),
+            const Text('Recursos Principais', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+          ],
+        ),
         const SizedBox(height: 16),
-        FeatureCard(
+        _buildEnhancedFeatureCard(
           icon: Icons.analytics_outlined,
           title: 'Diagnóstico Inteligente',
           description: 'Análise completa e precisa do seu veículo com tecnologia avançada',
+          color: AppColors.primaryRed,
           onTap: () => Navigator.pushNamed(context, '/diagnostic'),
         ),
-        if (_userRole.trim().toUpperCase() != 'ADMIN' && _userRole.trim().toUpperCase() != 'ASSISTENTE') ...[
-          const SizedBox(height: 20),
-          FeatureCard(
-            icon: Icons.electrical_services_outlined,
-            title: 'Esquema Elétrico',
-            description: 'Solicite o diagrama ou esquema elétrico do veículo',
-            onTap: () => Navigator.pushNamed(context, '/minhas-solicitacoes'),
-          ),
-        ],
-        const SizedBox(height: 20),
-        FeatureCard(
-          icon: Icons.chat_bubble_outline,
-          title: 'Chat com Especialista',
-          description: 'Tire suas dúvidas com IA ou abra um chamado e aguarde um mecânico especializado',
+        const SizedBox(height: 12),
+        _buildEnhancedFeatureCard(
+          icon: Icons.electrical_services_outlined,
+          title: 'Suporte a Esquema Elétrico',
+          description: 'Solicite o diagrama ou suporte técnico',
+          color: const Color(0xFFFF8F00),
+          onTap: () => _abrirSuporteEsquema(context),
+        ),
+        const SizedBox(height: 12),
+        _buildEnhancedFeatureCard(
+          icon: Icons.history,
+          title: 'Histórico Completo',
+          description: 'Acesse todos os diagnósticos',
+          color: const Color(0xFFE64A19),
           onTap: () => Navigator.pushNamed(context, '/history'),
         ),
-        const SizedBox(height: 20),
-        FeatureCard(
+        const SizedBox(height: 12),
+        _buildEnhancedFeatureCard(
           icon: Icons.description_outlined,
           title: 'Planos e Assinaturas',
-          description: 'Conheça nossos planos e fique por dentro de todas as funcionalidades',
+          description: 'Conheça nossos planos',
+          color: const Color(0xFF388E3C),
           onTap: () => Navigator.pushNamed(context, '/plans'),
         ),
-        if (_userRole.trim().toUpperCase() == 'ADMIN' || _userRole.trim().toUpperCase() == 'ASSISTENTE') ...[
-          const SizedBox(height: 20),
-          FeatureCard(
+        if (isAdmin || isAssistente) ...[
+          const SizedBox(height: 12),
+          _buildEnhancedFeatureCard(
             icon: Icons.support_agent_outlined,
             title: 'Atendimentos',
             description: 'Gerenciar chamados em aberto',
+            color: const Color(0xFF1976D2),
             onTap: () => Navigator.pushNamed(context, '/chat-history'),
           ),
         ],
-        if (_userRole.trim().toUpperCase() == 'ADMIN_EMPRESA') ...[
-          const SizedBox(height: 20),
-          FeatureCard(
+        if (isAdminEmpresa) ...[
+          const SizedBox(height: 12),
+          _buildEnhancedFeatureCard(
             icon: Icons.business_outlined,
             title: 'Minha Empresa',
             description: 'Gerenciar funcionários e dados',
+            color: const Color(0xFF7B1FA2),
             onTap: () => Navigator.pushNamed(context, '/empresa/funcionarios'),
           ),
         ],
-        const SizedBox(height: 20),
-        FeatureCard(
-          icon: Icons.manage_accounts_outlined,
-          title: 'Gestão do Sistema',
-          description: 'Painel administrativo',
-          onTap: () => Navigator.pushNamed(context, '/admin/users'),
-        ),
+        if (isAdmin) ...[
+          const SizedBox(height: 12),
+          _buildEnhancedFeatureCard(
+            icon: Icons.manage_accounts_outlined,
+            title: 'Gestão do Sistema',
+            description: 'Painel administrativo',
+            color: const Color(0xFFE53935),
+            onTap: () => Navigator.pushNamed(context, '/admin/users'),
+          ),
+        ],
       ],
     );
   }

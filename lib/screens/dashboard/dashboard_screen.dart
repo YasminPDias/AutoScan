@@ -39,7 +39,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const int _porPaginaCasos = 10;
 
   Map<String, int> _porDia = {};
-  bool _mostrarTodosCasos = false;
 
   @override
   void initState() {
@@ -114,16 +113,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
 
-    // Conta conversas abertas (admin)
+    // Mapeia e vincula as conversas existentes aos diagnósticos
     int conversasAbertas = 0;
     if (isAdmin && results.length > 3) {
       final convResult = results[3] as Map<String, dynamic>;
       if (convResult['success'] == true && convResult['data'] != null) {
         final convList = convResult['data'] as List;
-        conversasAbertas = convList.where((c) {
-          final status = (c as Map<String, dynamic>)['status']?.toString() ?? '';
-          return status != 'ENCERRADA' && status != 'FECHADA' && status != 'CONCLUIDA';
-        }).length;
+        final Map<String, Map<String, dynamic>> convMap = {};
+
+        for (final c in convList) {
+          if (c is Map<String, dynamic>) {
+            final diagId = c['aiDiagnosticoId']?.toString() ?? c['diagnosticoId']?.toString();
+            if (diagId != null && diagId.isNotEmpty) {
+              convMap[diagId] = c;
+            }
+            final status = c['status']?.toString() ?? '';
+            if (status != 'ENCERRADA' && status != 'FECHADA' && status != 'CONCLUIDA') {
+              conversasAbertas++;
+            }
+          }
+        }
+
+        for (final item in casos) {
+          final diagId = item['id']?.toString() ?? item['_id']?.toString();
+          if (diagId != null && convMap.containsKey(diagId)) {
+            item['conversa'] = convMap[diagId];
+          }
+        }
       }
     }
 
@@ -139,20 +155,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-Future<void> _irParaPaginaCasos(int pagina) async {
+  Future<void> _irParaPaginaCasos(int pagina) async {
     if (_isLoadingCasos) return;
     setState(() => _isLoadingCasos = true);
 
     final token = await AuthStorage.getToken();
     if (token == null) { setState(() => _isLoadingCasos = false); return; }
 
-    final result = await DiagnosticService.buscarDiagnosticosAbertosAdmin(
-      token: token, pagina: pagina, porPagina: _porPaginaCasos,
-    );
+    final role = await AuthStorage.getUserRole();
+    final isAdmin = (role ?? '').toUpperCase() == 'ADMIN' || (role ?? '').toUpperCase() == 'ASSISTENTE';
+
+    final results = await Future.wait([
+      DiagnosticService.buscarDiagnosticosAbertosAdmin(
+        token: token, pagina: pagina, porPagina: _porPaginaCasos,
+      ),
+      if (isAdmin) ChatService.buscarTodasConversas(token: token),
+    ]);
 
     if (!mounted) return;
 
-    // ← usa == true em vez de is bool pra evitar null
+    final result = results[0] as Map<String, dynamic>;
     if (result['success'] == true) {
       final data = result['data'];
       final lista = <Map<String, dynamic>>[];
@@ -163,6 +185,28 @@ Future<void> _irParaPaginaCasos(int pagina) async {
         }
         totalPaginas = int.tryParse(data['totalPaginas']?.toString() ?? '1') ?? 1;
       }
+
+      if (isAdmin && results.length > 1) {
+        final convResult = results[1] as Map<String, dynamic>;
+        if (convResult['success'] == true && convResult['data'] != null) {
+          final Map<String, Map<String, dynamic>> convMap = {};
+          for (final c in (convResult['data'] as List)) {
+            if (c is Map<String, dynamic>) {
+              final diagId = c['aiDiagnosticoId']?.toString() ?? c['diagnosticoId']?.toString();
+              if (diagId != null && diagId.isNotEmpty) {
+                convMap[diagId] = c;
+              }
+            }
+          }
+          for (final item in lista) {
+            final diagId = item['id']?.toString() ?? item['_id']?.toString();
+            if (diagId != null && convMap.containsKey(diagId)) {
+              item['conversa'] = convMap[diagId];
+            }
+          }
+        }
+      }
+
       setState(() {
         _casosAbertos = lista;
         _paginaCasos = pagina;
@@ -193,25 +237,65 @@ Future<void> _irParaPaginaCasos(int pagina) async {
     } catch (_) { return isoDate; }
   }
 
-  void _abrirChatDoCaso(Map<String, dynamic> item) {
-    final diagnosticoId = item['id']?.toString() ?? item['_id']?.toString();
-    final conversa = item['conversa'] as Map<String, dynamic>?;
-    final conversaId = conversa?['id']?.toString() ?? conversa?['_id']?.toString();
+  Future<void> _assumirEAbirChat(Map<String, dynamic> item) async {
+    final token = await AuthStorage.getToken();
+    if (token == null || token.isEmpty) return;
 
-    if (conversaId != null && conversaId.isNotEmpty) {
-      Navigator.pushNamed(context, '/chat', arguments: {'conversaId': conversaId});
-    } else if (diagnosticoId != null && diagnosticoId.isNotEmpty) {
-      final diagnosticoTexto = item['diagnostico']?.toString() ?? item['resultadoIA']?.toString();
-      Navigator.pushNamed(
-        context,
-        '/chat',
-        arguments: {
-          'diagnosticoId': diagnosticoId,
-          'diagnosticoTexto': diagnosticoTexto,
-        },
+    final diagnosticoId = item['id']?.toString() ?? item['_id']?.toString();
+
+    String? conversaId = () {
+      final c = item['conversa'];
+      if (c is Map) return (c['id'] ?? c['_id'])?.toString();
+      if (c is String && c.isNotEmpty) return c;
+      return (item['conversaId'] ?? item['conversa_id'])?.toString();
+    }();
+
+    if ((conversaId == null || conversaId.isEmpty) && diagnosticoId != null) {
+      final res = await ChatService.buscarConversaPorDiagnosticoId(token: token, diagnosticoId: diagnosticoId);
+      if (res['success'] == true && res['data'] != null) {
+        final data = res['data'];
+        if (data is Map) conversaId = (data['id'] ?? data['_id'])?.toString();
+        if (data is List && data.isNotEmpty && data.first is Map) {
+          conversaId = (data.first['id'] ?? data.first['_id'])?.toString();
+        }
+      }
+    }
+
+    if ((conversaId == null || conversaId.isEmpty) && diagnosticoId != null) {
+      final createRes = await ChatService.criarConversa(token: token, aiDiagnosticoId: diagnosticoId);
+      if (createRes['success'] == true && createRes['data'] is Map) {
+        conversaId = (createRes['data'] as Map)['id']?.toString();
+      }
+    }
+
+    if (conversaId == null || conversaId.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Não foi possível identificar a conversa deste chamado.'),
+          backgroundColor: AppColors.primaryRed,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
+      return;
+    }
+
+    final result = await ChatService.reivindicarConversa(token: token, conversaId: conversaId);
+    if (!mounted) return;
+
+    if (result['success'] == true) {
+      _carregar();
+      await Navigator.pushNamed(context, '/chat', arguments: {'conversaId': conversaId});
+      _carregar();
     } else {
-      Navigator.pushNamed(context, '/chat');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message']?.toString() ?? 'Erro ao assumir conversa.'),
+          backgroundColor: AppColors.primaryRed,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      _carregar();
     }
   }
 
@@ -369,11 +453,6 @@ Future<void> _irParaPaginaCasos(int pagina) async {
       );
     }
 
-    const int limite = 4;
-    final bool temMais = _casosAbertos.length > limite;
-    final listaExibicao = (_mostrarTodosCasos || !temMais)
-        ? _casosAbertos
-        : _casosAbertos.take(limite).toList();
 
     return Column(
       children: [
@@ -408,8 +487,22 @@ Future<void> _irParaPaginaCasos(int pagina) async {
 
     final conversa = item['conversa'] as Map<String, dynamic>?;
     final conversaStatus = conversa?['status']?.toString();
-    final atendenteNome = conversa?['atendenteNome']?.toString();
-    final conversaId = conversa?['id']?.toString();
+    final atendenteMap = conversa?['atendente'] as Map<String, dynamic>?;
+
+    final atendenteId = conversa?['atendenteId']?.toString() ??
+        atendenteMap?['id']?.toString();
+
+    final atendenteNomeRaw = conversa?['atendenteNome']?.toString() ??
+        (atendenteMap != null
+            ? '${atendenteMap['nome'] ?? ''} ${atendenteMap['sobrenome'] ?? ''}'.trim()
+            : null);
+    final atendenteNome = (atendenteNomeRaw != null && atendenteNomeRaw.isNotEmpty)
+        ? atendenteNomeRaw
+        : null;
+
+    final bool temAtendente = (atendenteId != null && atendenteId.trim().isNotEmpty) ||
+        (atendenteNome != null && atendenteNome.trim().isNotEmpty) ||
+        (conversaStatus?.toUpperCase() == 'EM_ATENDIMENTO');
 
     if (!context.isDesktop) {
       return Container(
@@ -496,7 +589,7 @@ Future<void> _irParaPaginaCasos(int pagina) async {
                 Expanded(
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: conversaStatus != null
+                    child: temAtendente && conversaStatus != null
                         ? _buildBadgeConversa(conversaStatus, atendenteNome)
                         : Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -515,32 +608,16 @@ Future<void> _irParaPaginaCasos(int pagina) async {
                           ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                if (conversaId != null)
+                if (!temAtendente) ...[
+                  const SizedBox(width: 10),
                   TextButton.icon(
-                    onPressed: () => Navigator.pushNamed(context, '/chat', arguments: {'conversaId': conversaId}),
-                    icon: const Icon(Icons.chat_bubble_outline, size: 14),
-                    label: const Text('Ver chat', style: TextStyle(fontSize: 12)),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primaryRed,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      backgroundColor: AppColors.primaryRed.withValues(alpha: 0.05),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  )
-                else
-                  TextButton.icon(
-                    onPressed: () => Navigator.pushNamed(context, '/diagnostic-result', arguments: item),
+                    onPressed: () => _assumirEAbirChat(item),
                     icon: const Icon(Icons.visibility_outlined, size: 14),
                     label: const Text('Ver diagnóstico', style: TextStyle(fontSize: 12)),
                     style: TextButton.styleFrom(
-                      foregroundColor: AppColors.textSecondary,
+                      foregroundColor: AppColors.primaryRed,
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      backgroundColor: AppColors.border.withValues(alpha: 0.2),
+                      backgroundColor: AppColors.primaryRed.withValues(alpha: 0.08),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -548,6 +625,7 @@ Future<void> _irParaPaginaCasos(int pagina) async {
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                   ),
+                ],
               ],
             ),
           ],
@@ -620,7 +698,7 @@ Future<void> _irParaPaginaCasos(int pagina) async {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (conversaStatus != null)
+              if (temAtendente && conversaStatus != null)
                 _buildBadgeConversa(conversaStatus, atendenteNome)
               else
                 Container(
@@ -634,32 +712,24 @@ Future<void> _irParaPaginaCasos(int pagina) async {
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFF9A825)),
                   ),
                 ),
-              const SizedBox(height: 8),
-              // botão de ação
-              if (conversaId != null)
+              if (!temAtendente) ...[
+                const SizedBox(height: 8),
                 TextButton.icon(
-                  onPressed: () => Navigator.pushNamed(context, '/chat', arguments: {'conversaId': conversaId}),
-                  icon: const Icon(Icons.chat_bubble_outline, size: 14),
-                  label: const Text('Ver chat', style: TextStyle(fontSize: 12)),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primaryRed,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                )
-              else
-                TextButton.icon(
-                  onPressed: () => Navigator.pushNamed(context, '/diagnostic-result', arguments: item),
+                  onPressed: () => _assumirEAbirChat(item),
                   icon: const Icon(Icons.visibility_outlined, size: 14),
                   label: const Text('Ver diagnóstico', style: TextStyle(fontSize: 12)),
                   style: TextButton.styleFrom(
-                    foregroundColor: AppColors.textSecondary,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    foregroundColor: AppColors.primaryRed,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    backgroundColor: AppColors.primaryRed.withValues(alpha: 0.08),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
+              ],
             ],
           ),
         ],

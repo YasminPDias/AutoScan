@@ -15,10 +15,7 @@ class ChatHistoryScreen extends StatefulWidget {
   State<ChatHistoryScreen> createState() => _ChatHistoryScreenState();
 }
 
-class _ChatHistoryScreenState extends State<ChatHistoryScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
-
+class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
   // aba "Meus atendimentos"
   bool _isLoading = true;
   String? _errorMessage;
@@ -27,32 +24,13 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
   int _totalPaginas = 1;
   static const int _porPagina = 10;
 
-  // aba "Disponíveis"
-  bool _isLoadingDisponiveis = true;
-  String? _errorDisponiveis;
-  List<ConversaModel> _disponiveis = [];
-
   String _tipoFila = 'DIAGNOSTICO';
   bool _initializedArgs = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      if (_tabController.indexIsChanging) return;
-      if (_tabController.index == 1 && _disponiveis.isEmpty) {
-        _carregarDisponiveis();
-      }
-    });
     socketService.onConversaAtualizada = _aoAtualizarConversa;
-    socketService.onNovoChamado = (_) => _carregarDisponiveis();
-    socketService.onConversaReivindicada = (data) {
-      final id = data['conversaId']?.toString();
-      if (id != null && mounted) {
-        setState(() => _disponiveis.removeWhere((c) => c.id == id));
-      }
-    };
   }
 
   @override
@@ -68,25 +46,23 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
         _tipoFila = 'DIAGNOSTICO';
       }
       _carregarConversas();
-      _carregarDisponiveis();
     }
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     if (socketService.onConversaAtualizada == _aoAtualizarConversa) {
       socketService.onConversaAtualizada = null;
     }
-    socketService.onNovoChamado = null;
-    socketService.onConversaReivindicada = null;
     super.dispose();
   }
 
   void _aoAtualizarConversa(Map<String, dynamic> data) {
     if (!mounted) return;
     final conversaId = data['conversaId']?.toString();
+    final tipo = data['tipo']?.toString();
     if (conversaId == null) return;
+    if (tipo != null) ChatReadTracker.registrarTipo(conversaId, tipo);
     setState(() {
       _conversas = _conversas.map((conv) {
         if (conv.id != conversaId) return conv;
@@ -101,6 +77,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
           clienteId: conv.clienteId, atendenteNome: conv.atendenteNome,
           atendenteId: conv.atendenteId, createdAt: conv.createdAt,
           ultimaMensagem: ultimaMensagem,
+          tipo: conv.tipo,
         );
       }).toList();
       ChatReadTracker.incrementar(conversaId);
@@ -121,6 +98,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
       if (!mounted) return;
       if (result['success'] == true) {
         final listaCompleta = (result['data'] as List<ConversaModel>);
+        ChatReadTracker.registrarTipos(listaCompleta);
         final lista = listaCompleta.where((c) {
           final s = c.status?.toUpperCase() ?? '';
           final matchTipo = c.tipo == _tipoFila;
@@ -133,11 +111,8 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
               (naoLidasResult['data'] as List).cast<Map<String, dynamic>>());
         }
 
-        final activeIds = {
-          ...lista.map((c) => c.id),
-          ..._disponiveis.map((c) => c.id),
-        };
-        ChatReadTracker.manterApenas(activeIds);
+        final activeIds = lista.map((c) => c.id).toSet();
+        ChatReadTracker.manterApenasPorTipo(activeIds, _tipoFila);
 
         setState(() {
           _conversas = lista;
@@ -153,86 +128,19 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
     }
   }
 
-  Future<void> _carregarDisponiveis() async {
-    if (!mounted) return;
-    setState(() { _isLoadingDisponiveis = true; _errorDisponiveis = null; });
-    try {
-      final token = await AuthStorage.getToken();
-      if (token == null) return;
-
-      final res = await ChatService.buscarConversasDisponiveis(
-        token: token,
-        tipo: _tipoFila,
-      );
-
-      if (!mounted) return;
-
-      if (res['success'] == true) {
-        final dados = res['data'];
-        final lista = ((dados is Map ? dados['dados'] : dados) as List)
-            .map((j) => ConversaModel.fromJson(j as Map<String, dynamic>)).toList();
-
-        // Ordena por data de criação descrescente
-        lista.sort((a, b) {
-          final dateA = a.createdAt;
-          final dateB = b.createdAt;
-          if (dateA == null) return 1;
-          if (dateB == null) return -1;
-          return dateB.compareTo(dateA);
-        });
-
-        final activeIds = {
-          ..._conversas.map((c) => c.id),
-          ...lista.map((c) => c.id),
-        };
-        ChatReadTracker.manterApenas(activeIds);
-
-        setState(() {
-          _disponiveis = lista;
-          _isLoadingDisponiveis = false;
-        });
-      } else {
-        setState(() {
-          _isLoadingDisponiveis = false;
-          _errorDisponiveis = res['message']?.toString() ?? 'Erro ao carregar disponíveis.';
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoadingDisponiveis = false;
-          _errorDisponiveis = 'Erro de conexão: $e';
-        });
-      }
-    }
-  }
-
-  Future<void> _assumirConversa(ConversaModel conv) async {
-    final token = await AuthStorage.getToken();
-    if (token == null) return;
-    final result = await ChatService.reivindicarConversa(token: token, conversaId: conv.id);
-    if (!mounted) return;
-    if (result['success'] == true) {
-      setState(() => _disponiveis.removeWhere((c) => c.id == conv.id));
-      _carregarConversas();
-      Navigator.pushNamed(context, '/chat', arguments: {'conversaId': conv.id});
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(result['message'] ?? 'Erro ao assumir conversa'),
-        backgroundColor: AppColors.primaryRed,
-        behavior: SnackBarBehavior.floating,
-      ));
-      _carregarDisponiveis();
-    }
-  }
-
   void _abrirConversa(String conversaId) async {
     ChatReadTracker.markRead(conversaId);
     setState(() {});
-    await Navigator.pushNamed(context, '/chat', arguments: {'conversaId': conversaId});
+    await Navigator.pushNamed(
+      context,
+      '/chat',
+      arguments: {
+        'conversaId': conversaId,
+        'disponivel': false,
+      },
+    );
     if (mounted) {
-      _carregarConversas();
-      _carregarDisponiveis();
+      await _carregarConversas();
     }
   }
 
@@ -249,8 +157,11 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
-              if (Navigator.canPop(context)) Navigator.pop(context);
-              else Navigator.pushReplacementNamed(context, '/home');
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              } else {
+                Navigator.pushReplacementNamed(context, '/home');
+              }
             },
           ),
         ),
@@ -260,59 +171,21 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
               color: Colors.white,
               padding: EdgeInsets.fromLTRB(
                 context.isDesktop ? 40 : 20, context.isDesktop ? 32 : 16,
-                context.isDesktop ? 40 : 20, 0,
+                context.isDesktop ? 40 : 20, context.isDesktop ? 20 : 12,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildHeader(),
-                  const SizedBox(height: 16),
-                  TabBar(
-                    controller: _tabController,
-                    labelColor: AppColors.primaryRed,
-                    unselectedLabelColor: AppColors.textSecondary,
-                    indicatorColor: AppColors.primaryRed,
-                    indicatorWeight: 2,
-                    tabs: [
-                      Tab(child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        const Text('Meus atendimentos'),
-                        if (_conversas.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          _buildTabBadge('${_conversas.length}', AppColors.primaryRed),
-                        ],
-                      ])),
-                      Tab(child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        const Text('Disponíveis'),
-                        if (_disponiveis.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          _buildTabBadge('${_disponiveis.length}', const Color(0xFFF57C00)),
-                        ],
-                      ])),
-                    ],
-                  ),
                 ],
               ),
             ),
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [_buildAbaConversas(), _buildAbaDisponiveis()],
-              ),
+              child: _buildAbaConversas(),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildTabBadge(String texto, Color cor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(
-        color: cor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(texto, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: cor)),
     );
   }
 
@@ -328,29 +201,12 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
           if (_errorMessage != null) _buildErrorBanner(_errorMessage!, () => _carregarConversas())
           else if (_conversas.isEmpty) _buildEmpty('Nenhum atendimento encontrado', 'Os chats iniciados pelos clientes aparecerão aqui.')
           else ...[
-            _buildLista(_conversas, disponivel: false),
+            _buildLista(_conversas),
             if (_totalPaginas > 1) ...[
               const SizedBox(height: 24),
               _buildPaginacao(),
             ],
           ],
-        ]),
-      ),
-    );
-  }
-
-  Widget _buildAbaDisponiveis() {
-    if (_isLoadingDisponiveis) return _buildLoading('Carregando chamados disponíveis...');
-    return RefreshIndicator(
-      onRefresh: _carregarDisponiveis,
-      color: AppColors.primaryRed,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.all(context.isDesktop ? 40 : 20),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (_errorDisponiveis != null) _buildErrorBanner(_errorDisponiveis!, _carregarDisponiveis)
-          else if (_disponiveis.isEmpty) _buildEmpty('Nenhum chamado disponível', 'Quando um cliente abrir um chamado sem atendente, aparecerá aqui.')
-          else _buildLista(_disponiveis, disponivel: true),
         ]),
       ),
     );
@@ -474,7 +330,9 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
       const Spacer(),
       IconButton(
         icon: const Icon(Icons.refresh),
-        onPressed: () { _carregarConversas(); _carregarDisponiveis(); },
+        onPressed: () async {
+          await _carregarConversas();
+        },
         tooltip: 'Atualizar', color: AppColors.textSecondary,
       ),
     ]);
@@ -514,20 +372,20 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
     ));
   }
 
-  Widget _buildLista(List<ConversaModel> lista, {required bool disponivel}) {
+  Widget _buildLista(List<ConversaModel> lista) {
     final total = lista.length;
     if (context.isDesktop) {
       final metade = (total / 2).ceil();
       return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Expanded(child: Column(children: List.generate(metade, (i) => _buildItemConversa(lista[i], i + 1, disponivel)))),
+        Expanded(child: Column(children: List.generate(metade, (i) => _buildItemConversa(lista[i], i + 1)))),
         const SizedBox(width: 16),
-        Expanded(child: Column(children: List.generate(total - metade, (i) => _buildItemConversa(lista[metade + i], metade + i + 1, disponivel)))),
+        Expanded(child: Column(children: List.generate(total - metade, (i) => _buildItemConversa(lista[metade + i], metade + i + 1)))),
       ]);
     }
-    return Column(children: List.generate(total, (i) => _buildItemConversa(lista[i], i + 1, disponivel)));
+    return Column(children: List.generate(total, (i) => _buildItemConversa(lista[i], i + 1)));
   }
 
-  Widget _buildItemConversa(ConversaModel conv, int numero, bool disponivel) {
+  Widget _buildItemConversa(ConversaModel conv, int numero) {
     final temNaoLida = ChatReadTracker.hasUnread(conv.id);
     final ultima = conv.ultimaMensagem;
     final nomeCliente = conv.clienteNome;
@@ -545,11 +403,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
         ),
       ),
       child: InkWell(
-        onTap: disponivel
-            ? (conv.tipo == 'ESQUEMA_ELETRICO'
-                ? () => _abrirConversa(conv.id, disponivel: true)
-                : null)
-            : () => _abrirConversa(conv.id, disponivel: false),
+        onTap: () => _abrirConversa(conv.id),
         borderRadius: BorderRadius.circular(12),
         child: IntrinsicHeight(
           child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -641,23 +495,11 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                if (disponivel)
-                  ElevatedButton(
-                    onPressed: () => _assumirConversa(conv),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryRed,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    child: const Text('Assumir', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
-                  )
-                else ...[
                   if (temNaoLida) ...[
                     Container(width: 10, height: 10, decoration: const BoxDecoration(color: AppColors.primaryRed, shape: BoxShape.circle)),
                     const SizedBox(height: 6),
                   ],
                   const Icon(Icons.chevron_right, color: AppColors.textLight, size: 20),
-                ],
               ]),
             ),
           ]),

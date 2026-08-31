@@ -30,6 +30,13 @@ class _AppDrawerState extends State<AppDrawer> {
     return role == 'ADMIN' || role == 'ASSISTENTE';
   }
 
+  bool get _deveExibirAtendimentos {
+    final role = _userRole.trim().toUpperCase();
+    if (role == 'ASSISTENTE') return true;
+    if (role == 'ADMIN') return ChatReadTracker.temMeusAtendimentos;
+    return false;
+  }
+
   Uint8List? _decodePhotoBytes(String rawPhoto) {
     try {
       final normalized = rawPhoto.trim();
@@ -261,55 +268,85 @@ class _AppDrawerState extends State<AppDrawer> {
                       Navigator.pushReplacementNamed(context, '/chat');
                     },
                   ),
-                if (_isAdminOrAssistente) ...[
+                if (_deveExibirAtendimentos) ...[
                   ValueListenableBuilder<int>(
                     valueListenable: ChatReadTracker.notifier,
-                    builder: (context, totalUnread, _) {
-                      return ListTile(
-                        leading: const Icon(Icons.support_agent),
-                        title: Row(
-                          children: [
-                            const Text('Atend. Diagnósticos'),
-                            if (totalUnread > 0) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryRed,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  '$totalUnread',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                    builder: (context, _, __) {
+                      final diagCount = ChatReadTracker.totalDiagnosticoUnread;
+                      final esqCount = ChatReadTracker.totalEsquemaUnread;
+
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.support_agent),
+                            title: Row(
+                              children: [
+                                const Text('Atend. Diagnósticos'),
+                                if (diagCount > 0) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryRed,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      '$diagCount',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.pushReplacementNamed(
-                            context,
-                            '/chat-history',
-                            arguments: const {'tipo': 'DIAGNOSTICO'},
-                          );
-                        },
-                      );
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.electrical_services),
-                    title: const Text('Atend. Esquemas'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushReplacementNamed(
-                        context,
-                        '/chat-history',
-                        arguments: const {'tipo': 'ESQUEMA_ELETRICO'},
+                                ],
+                              ],
+                            ),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.pushReplacementNamed(
+                                context,
+                                '/chat-history',
+                                arguments: const {'tipo': 'DIAGNOSTICO'},
+                              );
+                            },
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.electrical_services),
+                            title: Row(
+                              children: [
+                                const Text('Atend. Esquemas'),
+                                if (esqCount > 0) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryRed,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      '$esqCount',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.pushReplacementNamed(
+                                context,
+                                '/chat-history',
+                                arguments: const {'tipo': 'ESQUEMA_ELETRICO'},
+                              );
+                            },
+                          ),
+                        ],
                       );
                     },
                   ),
@@ -323,14 +360,15 @@ class _AppDrawerState extends State<AppDrawer> {
                       Navigator.pushReplacementNamed(context, '/empresa/funcionarios');
                     },
                   ),
-                ListTile(
-                  leading: const Icon(Icons.manage_accounts),
-                  title: const Text('Gestão do Sistema'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.pushReplacementNamed(context, '/admin/users');
-                  },
-                ),
+                if (_userRole.trim().toUpperCase() == 'ADMIN')
+                  ListTile(
+                    leading: const Icon(Icons.manage_accounts),
+                    title: const Text('Gestão do Sistema'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushReplacementNamed(context, '/admin/users');
+                    },
+                  ),
                 ListTile(
                   leading: const Icon(Icons.history),
                   title: const Text('Histórico'),

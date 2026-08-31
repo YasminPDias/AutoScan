@@ -20,9 +20,9 @@ import '../../services/web_audio_recorder.dart';
 import '../../services/chat_read_tracker.dart';
 import '../../services/atendimento_service.dart';
 import '../../services/audio_player_controller.dart';
-import '../../models/mensagem_model.dart';
 import '../../widgets/chat_midia_widgets.dart';
-import '../../services/esquema_service.dart';
+import '../../models/mensagem_model.dart';
+
 
 const _uuid = Uuid();
 
@@ -95,6 +95,10 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_clienteId == null || _myUserId == null) return false;
     return _clienteId == _myUserId;
   }
+
+
+
+  bool get _podeEncerrarConversa => _isDonoDaConversa;
 
   @override
   void initState() {
@@ -241,22 +245,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (!mounted) return;
 
-    // Se der 403 (e não foi reivindicado acima por falta da flag), verificamos se é
-    // do tipo ESQUEMA_ELETRICO. Se for, o atendente assume automaticamente (fallback URL/Push).
     if (convResult['statusCode'] == 403) {
       final role = await AuthStorage.getUserRole();
       final normalizedRole = role?.trim().toUpperCase() ?? '';
       final isAtendente = normalizedRole == 'ADMIN' || normalizedRole == 'ASSISTENTE';
 
       if (isAtendente) {
-        // Tenta obter os detalhes da solicitação de esquema elétrico. Se for sucesso, sabemos que é do tipo ESQUEMA_ELETRICO.
-        final esqDet = await EsquemaService.obterDetalhe(token: _token!, conversaId: conversaId);
-        if (esqDet['success'] == true) {
-          final claimRes = await ChatService.reivindicarConversa(token: _token!, conversaId: conversaId);
-          if (claimRes['success'] == true) {
-            convResult = await ChatService.buscarConversa(token: _token!, conversaId: conversaId);
-            if (!mounted) return;
-          }
+        final claimRes = await ChatService.reivindicarConversa(token: _token!, conversaId: conversaId);
+        if (claimRes['success'] == true) {
+          convResult = await ChatService.buscarConversa(token: _token!, conversaId: conversaId);
+          if (!mounted) return;
         }
       }
     }
@@ -273,19 +271,20 @@ class _ChatScreenState extends State<ChatScreen> {
       final data = convResult['data'] as Map<String, dynamic>;
       final status = data['status']?.toString() ?? '';
       final atendenteId = data['atendenteId']?.toString();
-      final tipo = data['tipo']?.toString()?.toUpperCase() ?? '';
 
       setState(() {
         _conversaStatus = status;
         _clienteId = data['clienteId']?.toString();
       });
 
-      // Se for atendente e o status de ESQUEMA_ELETRICO ainda estiver aguardando/pendente ou sem atendente atribuído
       final role = await AuthStorage.getUserRole();
       final normalizedRole = role?.trim().toUpperCase() ?? '';
       final isAtendente = normalizedRole == 'ADMIN' || normalizedRole == 'ASSISTENTE';
 
-      if (isAtendente && tipo == 'ESQUEMA_ELETRICO' && (status == 'AGUARDANDO' || status == 'PENDENTE' || atendenteId == null || atendenteId.isEmpty)) {
+      final statusUpper = status.toUpperCase();
+      final isFinalizada = statusUpper == 'ENCERRADA' || statusUpper == 'FECHADA' || statusUpper == 'CONCLUIDA';
+
+      if (isAtendente && !isFinalizada && (atendenteId == null || atendenteId.isEmpty || atendenteId != _myUserId)) {
         final claimRes = await ChatService.reivindicarConversa(token: _token!, conversaId: conversaId);
         if (claimRes['success'] == true && mounted) {
           setState(() {
@@ -1445,7 +1444,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              if (_isDonoDaConversa) ...[
+              if (_podeEncerrarConversa) ...[
                 Tooltip(
                   message: 'Problema resolvido — encerrar conversa',
                   child: _isEncerrandoConversa
