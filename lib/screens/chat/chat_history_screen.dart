@@ -32,6 +32,9 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
   String? _errorDisponiveis;
   List<ConversaModel> _disponiveis = [];
 
+  String _tipoFila = 'DIAGNOSTICO';
+  bool _initializedArgs = false;
+
   @override
   void initState() {
     super.initState();
@@ -42,8 +45,6 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
         _carregarDisponiveis();
       }
     });
-    _carregarConversas();
-    _carregarDisponiveis();
     socketService.onConversaAtualizada = _aoAtualizarConversa;
     socketService.onNovoChamado = (_) => _carregarDisponiveis();
     socketService.onConversaReivindicada = (data) {
@@ -52,6 +53,23 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
         setState(() => _disponiveis.removeWhere((c) => c.id == id));
       }
     };
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initializedArgs) {
+      _initializedArgs = true;
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      final tipoArg = args?['tipo']?.toString();
+      if (tipoArg == 'ESQUEMA_ELETRICO') {
+        _tipoFila = 'ESQUEMA_ELETRICO';
+      } else {
+        _tipoFila = 'DIAGNOSTICO';
+      }
+      _carregarConversas();
+      _carregarDisponiveis();
+    }
   }
 
   @override
@@ -102,12 +120,25 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
       );
       if (!mounted) return;
       if (result['success'] == true) {
-        final lista = (result['data'] as List<ConversaModel>);
+        final listaCompleta = (result['data'] as List<ConversaModel>);
+        final lista = listaCompleta.where((c) {
+          final s = c.status?.toUpperCase() ?? '';
+          final matchTipo = c.tipo == _tipoFila;
+          return matchTipo && s != 'ENCERRADA' && s != 'CONCLUIDA' && s != 'FECHADA';
+        }).toList();
+
         final naoLidasResult = await ChatService.buscarNaoLidas(token: token);
         if (naoLidasResult['success'] == true && mounted) {
           ChatReadTracker.popularDoBackend(
               (naoLidasResult['data'] as List).cast<Map<String, dynamic>>());
         }
+
+        final activeIds = {
+          ...lista.map((c) => c.id),
+          ..._disponiveis.map((c) => c.id),
+        };
+        ChatReadTracker.manterApenas(activeIds);
+
         setState(() {
           _conversas = lista;
           _paginaAtual = result['pagina'] ?? pagina;
@@ -128,18 +159,51 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
     try {
       final token = await AuthStorage.getToken();
       if (token == null) return;
-      final result = await ChatService.buscarConversasDisponiveis(token: token);
+
+      final res = await ChatService.buscarConversasDisponiveis(
+        token: token,
+        tipo: _tipoFila,
+      );
+
       if (!mounted) return;
-      if (result['success'] == true) {
-        final dados = result['data'];
+
+      if (res['success'] == true) {
+        final dados = res['data'];
         final lista = ((dados is Map ? dados['dados'] : dados) as List)
             .map((j) => ConversaModel.fromJson(j as Map<String, dynamic>)).toList();
-        setState(() { _disponiveis = lista; _isLoadingDisponiveis = false; });
+
+        // Ordena por data de criação descrescente
+        lista.sort((a, b) {
+          final dateA = a.createdAt;
+          final dateB = b.createdAt;
+          if (dateA == null) return 1;
+          if (dateB == null) return -1;
+          return dateB.compareTo(dateA);
+        });
+
+        final activeIds = {
+          ..._conversas.map((c) => c.id),
+          ...lista.map((c) => c.id),
+        };
+        ChatReadTracker.manterApenas(activeIds);
+
+        setState(() {
+          _disponiveis = lista;
+          _isLoadingDisponiveis = false;
+        });
       } else {
-        setState(() { _isLoadingDisponiveis = false; _errorDisponiveis = result['message']?.toString(); });
+        setState(() {
+          _isLoadingDisponiveis = false;
+          _errorDisponiveis = res['message']?.toString() ?? 'Erro ao carregar disponíveis.';
+        });
       }
     } catch (e) {
-      if (mounted) setState(() { _isLoadingDisponiveis = false; _errorDisponiveis = 'Erro de conexão: $e'; });
+      if (mounted) {
+        setState(() {
+          _isLoadingDisponiveis = false;
+          _errorDisponiveis = 'Erro de conexão: $e';
+        });
+      }
     }
   }
 
@@ -162,10 +226,14 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
     }
   }
 
-  void _abrirConversa(String conversaId) {
+  void _abrirConversa(String conversaId) async {
     ChatReadTracker.markRead(conversaId);
     setState(() {});
-    Navigator.pushNamed(context, '/chat', arguments: {'conversaId': conversaId});
+    await Navigator.pushNamed(context, '/chat', arguments: {'conversaId': conversaId});
+    if (mounted) {
+      _carregarConversas();
+      _carregarDisponiveis();
+    }
   }
 
   @override
@@ -477,7 +545,11 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
         ),
       ),
       child: InkWell(
-        onTap: disponivel ? null : () => _abrirConversa(conv.id),
+        onTap: disponivel
+            ? (conv.tipo == 'ESQUEMA_ELETRICO'
+                ? () => _abrirConversa(conv.id, disponivel: true)
+                : null)
+            : () => _abrirConversa(conv.id, disponivel: false),
         borderRadius: BorderRadius.circular(12),
         child: IntrinsicHeight(
           child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -509,6 +581,25 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen>
                       ),
                       overflow: TextOverflow.ellipsis,
                     )),
+                    if (conv.tipo == 'ESQUEMA_ELETRICO') ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE3F2FD),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFF90CAF9)),
+                        ),
+                        child: const Text(
+                          'Esquema',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0D47A1),
+                          ),
+                        ),
+                      ),
+                    ],
                     if (temNaoLida) ...[
                       const SizedBox(width: 8),
                       Container(

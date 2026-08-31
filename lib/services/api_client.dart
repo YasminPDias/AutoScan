@@ -9,14 +9,12 @@ import 'socket_service.dart';
 
 /// Cliente HTTP centralizado que intercepta 401 e executa logout automático.
 ///
-/// Usa isso em vez de `http.get`/`http.post` direto nos services — assim
-/// a lógica de "JWT expirou → desregistra push → desconecta socket → limpa
-/// sessão → vai pro login" fica num único lugar, sem precisar checar 401
-/// em cada método de cada service.
-///
 /// Uso:
 ///   final response = await ApiClient.get('/conversas', token: token);
 ///   final response = await ApiClient.post('/dispositivos', token: token, body: {...});
+///
+/// Para requisições que não passam por estes helpers (multipart, por exemplo),
+/// chame `ApiClient.tratarExpiracao(statusCode, body)` manualmente.
 class ApiClient {
   static final _navigatorKey = navigatorKey; // vem do push_service.dart
 
@@ -31,7 +29,7 @@ class ApiClient {
       _uri(path),
       headers: _headers(token, extraHeaders),
     );
-    await _checarExpiracao(response, token);
+    await tratarExpiracao(response.statusCode, response.body);
     return response;
   }
 
@@ -48,7 +46,7 @@ class ApiClient {
       headers: _headers(token, extraHeaders),
       body: body != null ? jsonEncode(body) : null,
     );
-    await _checarExpiracao(response, token);
+    await tratarExpiracao(response.statusCode, response.body);
     return response;
   }
 
@@ -65,7 +63,7 @@ class ApiClient {
       headers: _headers(token, extraHeaders),
       body: body != null ? jsonEncode(body) : null,
     );
-    await _checarExpiracao(response, token);
+    await tratarExpiracao(response.statusCode, response.body);
     return response;
   }
 
@@ -82,7 +80,7 @@ class ApiClient {
       headers: _headers(token, extraHeaders),
       body: body != null ? jsonEncode(body) : null,
     );
-    await _checarExpiracao(response, token);
+    await tratarExpiracao(response.statusCode, response.body);
     return response;
   }
 
@@ -99,27 +97,23 @@ class ApiClient {
       headers: _headers(token, extraHeaders),
       body: body != null ? jsonEncode(body) : null,
     );
-    await _checarExpiracao(response, token);
+    await tratarExpiracao(response.statusCode, response.body);
     return response;
   }
 
   // ─── Internos ─────────────────────────────────────────────────────────────
 
+  static Uri uri(String path) => _uri(path);
+
   static Uri _uri(String path) {
     // suporta tanto '/conversas' quanto 'conversas' (com ou sem barra inicial)
     final clean = path.startsWith('/') ? path : '/$path';
-    // ApiConfig.baseUrl vem de api_config.dart
     return Uri.parse('${_baseUrl()}$clean');
   }
 
-  static String _baseUrl() {
-    return ApiConfig.baseUrl;
-  }
+  static String _baseUrl() => ApiConfig.baseUrl;
 
-  static Map<String, String> _headers(
-    String token,
-    Map<String, String>? extra,
-  ) {
+  static Map<String, String> _headers(String token, Map<String, String>? extra) {
     return {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',
@@ -127,20 +121,19 @@ class ApiClient {
     };
   }
 
-  static Future<void> _checarExpiracao(
-    http.Response response,
-    String tokenUsado,
-  ) async {
-    if (response.statusCode != 401) return;
+  /// Publico: o upload multipart nao passa pelos helpers acima e precisa
+  /// chamar isto direto. Antes de o endpoint ganhar AuthGuard, um token
+  /// expirado no upload virava "Erro ao enviar imagem" sem redirect.
+  static Future<void> tratarExpiracao(int statusCode, String body) async {
+    if (statusCode != 401) return;
 
     loggerService.w('JWT expirado detectado — executando logout automático');
 
-    // lê a mensagem de erro do backend antes de limpar tudo
     String mensagem = 'Sua sessão foi encerrada. Faça login novamente.';
     try {
-      final body = jsonDecode(response.body);
-      if (body is Map && body['message'] != null) {
-        mensagem = body['message'].toString();
+      final decoded = jsonDecode(body);
+      if (decoded is Map && decoded['message'] != null) {
+        mensagem = decoded['message'].toString();
       }
     } catch (_) {}
 
@@ -153,7 +146,6 @@ class ApiClient {
 
     final context = _navigatorKey.currentContext;
     if (context != null && context.mounted) {
-      // navega pro login passando a mensagem como argumento
       Navigator.of(context).pushNamedAndRemoveUntil(
         '/login',
         (route) => false,

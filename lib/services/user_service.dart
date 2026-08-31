@@ -141,7 +141,7 @@ class UserService {
     required String nome,
     required String sobrenome,
     required String email,
-    required String senha,
+    String? senha,
     required String funcao, // 'ADMIN' | 'ASSISTENTE' | 'CLIENTE'
     required String telefone,
     String? fotoPerfil,
@@ -160,9 +160,12 @@ class UserService {
           ..fields['nome'] = nome
           ..fields['sobrenome'] = sobrenome
           ..fields['email'] = email
-          ..fields['senha'] = senha
           ..fields['funcao'] = funcao
           ..fields['telefone'] = telefone;
+
+        if (senha != null && senha.isNotEmpty) {
+          request.fields['senha'] = senha;
+        }
 
         request.files.add(
           http.MultipartFile.fromBytes(
@@ -189,10 +192,12 @@ class UserService {
           'nome': nome,
           'sobrenome': sobrenome,
           'email': email,
-          'senha': senha,
           'funcao': funcao,
           'telefone': telefone,
         };
+        if (senha != null && senha.isNotEmpty) {
+          body['senha'] = senha;
+        }
         if (fotoPerfil != null && fotoPerfil.isNotEmpty) {
           body['fotoPerfil'] = fotoPerfil;
         }

@@ -57,6 +57,7 @@ class ConversaModel {
   final String? atendenteId;
   final DateTime? createdAt;
   final UltimaMensagem? ultimaMensagem;
+  final String? tipo;
 
   ConversaModel({
     required this.id,
@@ -68,6 +69,7 @@ class ConversaModel {
     this.atendenteId,
     this.createdAt,
     this.ultimaMensagem,
+    this.tipo,
   });
 
   factory ConversaModel.fromJson(Map<String, dynamic> json) {
@@ -84,6 +86,7 @@ class ConversaModel {
       ultimaMensagem: json['ultimaMensagem'] != null
           ? UltimaMensagem.fromJson(json['ultimaMensagem'] as Map<String, dynamic>)
           : null,
+      tipo: json['tipo']?.toString(),
     );
   }
 }

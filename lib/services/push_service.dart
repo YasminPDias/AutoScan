@@ -57,6 +57,20 @@ class PushService {
   }
 
   Future<void> inicializar() async {
+    // Registra listeners de recebimento de mensagens e cliques imediatamente
+    FirebaseMessaging.onMessage.listen((message) {
+      loggerService.i('Push recebido em foreground: ${message.data}');
+      _tratarPushEmForeground(message);
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen(_tratarToque);
+
+    // Executa a solicitação de permissão e o registro do token em segundo plano
+    // para nunca bloquear a inicialização ou o fluxo de login
+    _inicializarFCMBackground();
+  }
+
+  Future<void> _inicializarFCMBackground() async {
     try {
       await FirebaseMessaging.instance.requestPermission();
     } catch (e) {
@@ -78,18 +92,12 @@ class PushService {
       loggerService.w('Não foi possível obter/registrar o token FCM: $e');
     }
 
-    // app em foreground: o socket só atualiza quem está DENTRO daquela
-    // conversa (entrarChat) — quem está em outra tela não recebe nada por
-    // ali, então aqui é onde avisamos visualmente
-    FirebaseMessaging.onMessage.listen((message) {
-      loggerService.i('Push recebido em foreground: ${message.data}');
-      _tratarPushEmForeground(message);
-    });
-
-    FirebaseMessaging.onMessageOpenedApp.listen(_tratarToque);
-
-    final mensagemInicial = await FirebaseMessaging.instance.getInitialMessage();
-    if (mensagemInicial != null) _tratarToque(mensagemInicial);
+    try {
+      final mensagemInicial = await FirebaseMessaging.instance.getInitialMessage();
+      if (mensagemInicial != null) _tratarToque(mensagemInicial);
+    } catch (e) {
+      loggerService.w('Não foi possível obter mensagem inicial do FCM: $e');
+    }
   }
 
   void _tratarPushEmForeground(RemoteMessage message) {

@@ -15,11 +15,14 @@ import 'screens/history/history_screen.dart';
 import 'screens/diagnostic/diagnostic_screen.dart';
 import 'screens/diagnostic/diagnostic_result_screen.dart';
 import 'screens/plans/plans_screen.dart';
+import 'screens/payment/payment_screen.dart';
 import 'screens/chat/chat_screen.dart';
 import 'screens/chat/chat_history_screen.dart';
 import 'screens/empresa/criar_empresa_screen.dart';
 import 'screens/empresa/empresa_funcionario_screen.dart';
 import 'screens/admin/users_screen.dart';
+import 'screens/esquema/solicitar_esquema_screen.dart';
+import 'screens/esquema/minhas_solicitacoes_screen.dart';
 import 'services/auth_storage.dart';
 import 'services/logger_service.dart';
 import 'services/socket_service.dart';
@@ -84,12 +87,15 @@ class AutexApp extends StatelessWidget {
         '/diagnostic': (context) => const DiagnosticScreen(),
         '/diagnostic-result': (context) => const DiagnosticResultScreen(),
         '/plans': (context) => const PlansScreen(),
+        '/pagamento': (context) => const PaymentScreen(),
         '/chat': (context) => const ChatScreen(),
         '/chat-history': (context) => const ChatHistoryScreen(),
         '/change-password': (context) => const ChangePasswordScreen(),
         '/empresa/criar': (context) => const CriarEmpresaScreen(),
         '/empresa/funcionarios': (context) => const EmpresaFuncionariosScreen(),
         '/admin/users': (context) => const UsersScreen(),
+        '/solicitar-esquema': (context) => const SolicitarEsquemaScreen(),
+        '/minhas-solicitacoes': (context) => const MinhasSolicitacoesScreen(),
       },
     );
   }

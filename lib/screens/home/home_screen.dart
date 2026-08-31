@@ -226,84 +226,146 @@ class _HomeScreenState extends State<HomeScreen> {
               final codObd = dados['codigoODB2']?.toString() ?? '';
 
               final tituloVeiculo = veiculo.isNotEmpty ? (ano.isNotEmpty ? '$veiculo ($ano)' : veiculo) : 'Veículo não informado';
+              final isDesktop = context.isDesktop;
 
               return Card(
                 elevation: 0,
+                margin: EdgeInsets.zero,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                   side: const BorderSide(color: AppColors.border),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // linha superior: ícone + texto + badge
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 44, height: 44,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1976D2).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.chat_bubble_outline, color: Color(0xFF1976D2), size: 24),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // título + badge com Wrap pra não quebrar
-                                Wrap(
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  spacing: 8,
-                                  runSpacing: 4,
+                child: InkWell(
+                  onTap: () => _abrirChatDoChamado(item),
+                  borderRadius: BorderRadius.circular(14),
+                  child: Padding(
+                    padding: EdgeInsets.all(isDesktop ? 20 : 16),
+                    child: isDesktop
+                        ? Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1976D2).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(Icons.forum_outlined, color: Color(0xFF1976D2), size: 24),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      veiculo.isNotEmpty
-                                          ? '$veiculo${ano.isNotEmpty ? ' ($ano)' : ''}'
-                                          : 'Veículo não informado',
-                                      style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.textPrimary,
-                                      ),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          tituloVeiculo,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        _buildStatusBadge(status),
+                                      ],
                                     ),
-                                    _buildStatusBadge(status),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      codObd.isNotEmpty
+                                          ? 'Código OBD: $codObd  •  Sintomas: $sintomas'
+                                          : 'Sintomas: $sintomas',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ],
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  codObd.isNotEmpty
-                                      ? 'Código OBD: $codObd | Sintomas: $sintomas'
-                                      : 'Sintomas: $sintomas',
-                                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(width: 20),
+                              ElevatedButton.icon(
+                                onPressed: () => _abrirChatDoChamado(item),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF1976D2),
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 ),
-                              ],
-                            ),
+                                icon: const Icon(Icons.chat_bubble, size: 16, color: Colors.white),
+                                label: const Text('Abrir Chat', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF1976D2).withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(Icons.forum_outlined, color: Color(0xFF1976D2), size: 22),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Wrap(
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          spacing: 8,
+                                          runSpacing: 4,
+                                          children: [
+                                            Text(
+                                              tituloVeiculo,
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.textPrimary,
+                                              ),
+                                            ),
+                                            _buildStatusBadge(status),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          codObd.isNotEmpty
+                                              ? 'Código OBD: $codObd | Sintomas: $sintomas'
+                                              : 'Sintomas: $sintomas',
+                                          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: () => _abrirChatDoChamado(item),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF1976D2),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  icon: const Icon(Icons.chat_bubble, size: 16, color: Colors.white),
+                                  label: const Text('Abrir Chat', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // botão sempre em largura total
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () => _abrirChatDoChamado(item),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1976D2),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          icon: const Icon(Icons.forum, size: 18, color: Colors.white),
-                          label: const Text('Abrir Chat', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               );
@@ -407,24 +469,46 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisCount: 3,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 24,
-          crossAxisSpacing: 24,
-          childAspectRatio: 1.35,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+          childAspectRatio: 3.4,
           children: [
             _buildEnhancedFeatureCard(icon: Icons.analytics_outlined, title: 'Diagnóstico Inteligente', description: 'Análise completa e precisa do seu veículo', color: AppColors.primaryRed, onTap: () => Navigator.pushNamed(context, '/diagnostic')),
+            if (_userRole.trim().toUpperCase() != 'ADMIN' && _userRole.trim().toUpperCase() != 'ASSISTENTE')
+              _buildEnhancedFeatureCard(icon: Icons.electrical_services_outlined, title: 'Esquema Elétrico', description: 'Solicite o diagrama do veículo', color: const Color(0xFFFF8F00), onTap: () => Navigator.pushNamed(context, '/minhas-solicitacoes')),
             _buildEnhancedFeatureCard(icon: Icons.chat_bubble_outline, title: 'Chat com Especialista', description: 'Tire dúvidas com IA e mecânicos', color: const Color(0xFF1976D2), onTap: () => Navigator.pushNamed(context, '/history')),
             _buildEnhancedFeatureCard(icon: Icons.description_outlined, title: 'Planos e Assinaturas', description: 'Conheça nossos planos', color: const Color(0xFF388E3C), onTap: () => Navigator.pushNamed(context, '/plans')),
             _buildEnhancedFeatureCard(icon: Icons.history, title: 'Histórico Completo', description: 'Acesse todos os diagnósticos', color: const Color(0xFFE64A19), onTap: () => Navigator.pushNamed(context, '/history')),
-            _buildEnhancedFeatureCard(icon: Icons.support_agent, title: 'Suporte 24/7', description: 'Assistência sempre disponível', color: const Color(0xFF7B1FA2), onTap: () => Navigator.pushNamed(context, '/history')),
-            _buildEnhancedFeatureCard(icon: Icons.trending_up, title: 'Relatórios Detalhados', description: 'Análises e estatísticas', color: const Color(0xFF00796B), onTap: () => Navigator.pushNamed(context, '/dashboard')),
-            if (_userRole.toUpperCase() == 'ADMIN')
+            _buildEnhancedFeatureCard(
+              icon: Icons.trending_up,
+              title: 'Relatórios Detalhados',
+              description: 'Análises e estatísticas',
+              color: const Color(0xFF00796B),
+              onTap: () => Navigator.pushNamed(context, '/admin/users'),
+            ),
+            if (_userRole.trim().toUpperCase() == 'ADMIN' || _userRole.trim().toUpperCase() == 'ASSISTENTE')
               _buildEnhancedFeatureCard(
-                icon: Icons.manage_accounts_outlined,
-                title: 'Gestão do Sistema',
-                description: 'Painel administrativo',
+                icon: Icons.support_agent_outlined,
+                title: 'Atendimentos',
+                description: 'Gerenciar chamados em aberto',
                 color: const Color(0xFF7B1FA2),
-                onTap: () => Navigator.pushNamed(context, '/admin/users'),
+                onTap: () => Navigator.pushNamed(context, '/chat-history'),
               ),
+            if (_userRole.trim().toUpperCase() == 'ADMIN_EMPRESA')
+              _buildEnhancedFeatureCard(
+                icon: Icons.business_outlined,
+                title: 'Minha Empresa',
+                description: 'Gerenciar funcionários e dados',
+                color: const Color(0xFF00897B),
+                onTap: () => Navigator.pushNamed(context, '/empresa/funcionarios'),
+              ),
+            _buildEnhancedFeatureCard(
+              icon: Icons.manage_accounts_outlined,
+              title: 'Gestão do Sistema',
+              description: 'Painel administrativo',
+              color: const Color(0xFFE53935),
+              onTap: () => Navigator.pushNamed(context, '/admin/users'),
+            ),
           ],
         ),
       ],
@@ -476,6 +560,15 @@ class _HomeScreenState extends State<HomeScreen> {
           description: 'Análise completa e precisa do seu veículo com tecnologia avançada',
           onTap: () => Navigator.pushNamed(context, '/diagnostic'),
         ),
+        if (_userRole.trim().toUpperCase() != 'ADMIN' && _userRole.trim().toUpperCase() != 'ASSISTENTE') ...[
+          const SizedBox(height: 20),
+          FeatureCard(
+            icon: Icons.electrical_services_outlined,
+            title: 'Esquema Elétrico',
+            description: 'Solicite o diagrama ou esquema elétrico do veículo',
+            onTap: () => Navigator.pushNamed(context, '/minhas-solicitacoes'),
+          ),
+        ],
         const SizedBox(height: 20),
         FeatureCard(
           icon: Icons.chat_bubble_outline,
@@ -490,15 +583,31 @@ class _HomeScreenState extends State<HomeScreen> {
           description: 'Conheça nossos planos e fique por dentro de todas as funcionalidades',
           onTap: () => Navigator.pushNamed(context, '/plans'),
         ),
-        if (_userRole.toUpperCase() == 'ADMIN') ...[
+        if (_userRole.trim().toUpperCase() == 'ADMIN' || _userRole.trim().toUpperCase() == 'ASSISTENTE') ...[
           const SizedBox(height: 20),
           FeatureCard(
-            icon: Icons.manage_accounts_outlined,
-            title: 'Gestão do Sistema',
-            description: 'Painel administrativo',
-            onTap: () => Navigator.pushNamed(context, '/admin/users'),
+            icon: Icons.support_agent_outlined,
+            title: 'Atendimentos',
+            description: 'Gerenciar chamados em aberto',
+            onTap: () => Navigator.pushNamed(context, '/chat-history'),
           ),
         ],
+        if (_userRole.trim().toUpperCase() == 'ADMIN_EMPRESA') ...[
+          const SizedBox(height: 20),
+          FeatureCard(
+            icon: Icons.business_outlined,
+            title: 'Minha Empresa',
+            description: 'Gerenciar funcionários e dados',
+            onTap: () => Navigator.pushNamed(context, '/empresa/funcionarios'),
+          ),
+        ],
+        const SizedBox(height: 20),
+        FeatureCard(
+          icon: Icons.manage_accounts_outlined,
+          title: 'Gestão do Sistema',
+          description: 'Painel administrativo',
+          onTap: () => Navigator.pushNamed(context, '/admin/users'),
+        ),
       ],
     );
   }
@@ -531,36 +640,69 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          )
+        ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
               children: [
                 Container(
-                  width: 42, height: 42,
-                  decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: Icon(icon, size: 24, color: color),
                 ),
-                Flexible(
+                const SizedBox(width: 14),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       const SizedBox(height: 2),
-                      Text(description, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.15), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      Text(
+                        description,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          height: 1.2,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
+                ),
+                const SizedBox(width: 6),
+                Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: Colors.grey.shade400,
                 ),
               ],
             ),

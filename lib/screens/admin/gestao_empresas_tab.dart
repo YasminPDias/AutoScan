@@ -21,16 +21,24 @@ class _GestaoEmpresasTabState extends State<GestaoEmpresasTab> {
   String _searchQuery = '';
   String? _errorMessage;
 
+  int _pagina = 1;
+  int _porPagina = 10;
+  int _total = 0;
+  int _totalPaginas = 1;
+
   @override
   void initState() {
     super.initState();
     _carregarEmpresas();
   }
 
-  Future<void> _carregarEmpresas() async {
+  Future<void> _carregarEmpresas({int? novaPagina}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      if (novaPagina != null) {
+        _pagina = novaPagina;
+      }
     });
 
     _token = await AuthStorage.getToken();
@@ -42,12 +50,29 @@ class _GestaoEmpresasTabState extends State<GestaoEmpresasTab> {
       return;
     }
 
-    final res = await EmpresaService.listarTodas(token: _token!);
+    final res = await EmpresaService.listarTodas(
+      token: _token!,
+      pagina: _pagina,
+      porPagina: _porPagina,
+    );
 
     if (!mounted) return;
 
     if (res['success'] == true) {
-      final list = (res['data'] as List).cast<dynamic>();
+      final data = res['data'];
+      List list = [];
+      if (data is Map && data.containsKey('dados')) {
+        list = data['dados'] as List;
+        _total = data['total'] as int? ?? 0;
+        _pagina = data['pagina'] as int? ?? 1;
+        _totalPaginas = data['totalPaginas'] as int? ?? 1;
+      } else if (data is List) {
+        list = data;
+        _total = list.length;
+        _totalPaginas = 1;
+        _pagina = 1;
+      }
+      
       setState(() {
         _empresas = list;
         _filtrarEmpresas(_searchQuery);
@@ -490,6 +515,30 @@ class _GestaoEmpresasTabState extends State<GestaoEmpresasTab> {
                             },
                           ),
           ),
+          if (!_isLoading && _totalPaginas > 1)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: AppColors.divider)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left),
+                    onPressed: _pagina > 1 ? () => _carregarEmpresas(novaPagina: _pagina - 1) : null,
+                  ),
+                  const SizedBox(width: 16),
+                  Text('Página $_pagina de $_totalPaginas', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 16),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right),
+                    onPressed: _pagina < _totalPaginas ? () => _carregarEmpresas(novaPagina: _pagina + 1) : null,
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

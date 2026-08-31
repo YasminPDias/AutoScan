@@ -14,6 +14,8 @@ class EmpresaService {
     required String estado,
   }) async {
     try {
+      final cleanCnpj = cnpj.replaceAll(RegExp(r'\D'), '');
+
       final response = await ApiClient.post(
         '/empresa',
         token: token,
@@ -21,7 +23,7 @@ class EmpresaService {
           'razaoSocial': razaoSocial,
           if (nomeFantasia != null && nomeFantasia.isNotEmpty)
             'nomeFantasia': nomeFantasia,
-          'cnpj': cnpj,
+          'cnpj': cleanCnpj,
           'emailContato': emailContato,
           if (telefone != null && telefone.isNotEmpty) 'telefone': telefone,
           'cidade': cidade,
@@ -91,15 +93,22 @@ class EmpresaService {
   /// GET /empresa — [ADMIN] Lista todas as empresas cadastradas no sistema
   static Future<Map<String, dynamic>> listarTodas({
     required String token,
+    int? pagina,
+    int? porPagina,
   }) async {
     try {
-      final response = await ApiClient.get('/empresa', token: token);
+      final query = <String>[];
+      if (pagina != null) query.add('pagina=$pagina');
+      if (porPagina != null) query.add('porPagina=$porPagina');
+      
+      final queryStr = query.isNotEmpty ? '?${query.join('&')}' : '';
+      final response = await ApiClient.get('/empresa$queryStr', token: token);
 
       loggerService.d('listarTodasEmpresas → ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return {'success': true, 'data': data is List ? data : [data]};
+        return {'success': true, 'data': data};
       }
       return {'success': false, 'message': _extractError(response.body)};
     } catch (e) {
@@ -122,6 +131,9 @@ class EmpresaService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        if (data is Map && data.containsKey('dados') && data['dados'] is List) {
+          return {'success': true, 'data': data['dados']};
+        }
         return {'success': true, 'data': data is List ? data : []};
       }
       return {'success': false, 'message': _extractError(response.body)};
