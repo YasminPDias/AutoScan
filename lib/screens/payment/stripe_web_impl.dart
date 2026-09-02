@@ -33,6 +33,15 @@ Future<void> confirmWebSetupElement({required String returnUrl}) {
   );
 }
 
+/// Confirma o PaymentIntent da primeira fatura da assinatura.
+///
+/// Com `payment_behavior: default_incomplete` o intent nasce em
+/// `requires_confirmation` — precisa ser confirmado, não é caso de
+/// handleNextAction. O payment method já vem anexado pelo backend.
+Future<void> confirmWebPayment({required String clientSecret}) {
+  return WebStripe.instance.handleNextAction(clientSecret);
+}
+
 // Sobrevive ao reload que o redirect de 3DS causa (mesma aba), some
 // sozinho quando a aba fecha — não deixa contexto de pagamento pendente
 // acumulando indefinidamente.

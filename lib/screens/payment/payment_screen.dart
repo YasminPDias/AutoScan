@@ -1,35 +1,21 @@
+
+import 'package:autex/models/resultado_assinatura.dart';
+
+import 'package:autex/screens/payment/aguardando_payment_screen.dart';
+
 import 'package:autex/screens/payment/stripe_web_impl.dart';
+import 'package:autex/screens/plans/beneficios_plano.dart';
 import 'package:autex/services/empresa/plano_service.dart';
 import 'package:autex/services/payment/cobranca_utils.dart';
 import 'package:autex/services/payment/pagamento_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../theme/app_colors.dart';
 import '../../services/auth_storage.dart';
-import '../../models/plano_model.dart'; // confere o caminho certo aí
+import '../../models/plano_model.dart';
 
-enum MetodoPagamento { cartao, pix, boleto }
-
-extension on MetodoPagamento {
-  String get valorApi => switch (this) {
-        MetodoPagamento.cartao => 'CARTAO',
-        MetodoPagamento.pix => 'PIX',
-        MetodoPagamento.boleto => 'BOLETO',
-      };
-  String get label => switch (this) {
-        MetodoPagamento.cartao => 'Cartão',
-        MetodoPagamento.pix => 'PIX',
-        MetodoPagamento.boleto => 'Boleto',
-      };
-  IconData get icone => switch (this) {
-        MetodoPagamento.cartao => Icons.credit_card,
-        MetodoPagamento.pix => Icons.qr_code,
-        MetodoPagamento.boleto => Icons.receipt_long,
-      };
-}
+enum _EscolhaPendente { voltar, ver, trocar }
 
 class PaymentScreen extends StatefulWidget {
   const PaymentScreen({super.key});
@@ -38,6 +24,18 @@ class PaymentScreen extends StatefulWidget {
 }
 
 class _PaymentScreenState extends State<PaymentScreen> {
+  /// Pix está fora enquanto a conta Stripe não é habilitada (invite-only para
+  /// contas brasileiras). O backend aceita os três — quando liberar, basta
+  /// devolver MetodoPagamento.pix a esta lista.
+  static const _metodosDisponiveis = [
+    MetodoPagamento.cartao,
+    MetodoPagamento.boleto,
+  ];
+
+  /// TODO: quando a tela de seleção de plano oferecer período, receber via
+  /// route args. Hoje MENSAL é o único intervalo ativo em plano_preco.
+  static const _intervalo = 'MENSAL';
+
   String? _planoId;
   String? _planoNome;
   String? _empresaId;
@@ -46,7 +44,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   bool _isLoading = true;
   bool _isSubmitting = false;
-  bool _concluido = false;
   String? _errorMessage;
 
   final _formKey = GlobalKey<FormState>();
@@ -69,16 +66,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
   final _nomeCartaoController = TextEditingController();
   final _cardFormController = CardFormEditController();
 
-  String? _urlFatura;
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_argsLidos) return;
     _argsLidos = true;
 
-    // volta de um redirect de 3DS (página recarregou) — retoma direto pra
-    // finalizar a assinatura, sem passar pelo formulário de novo
+    // Volta de um redirect de 3DS (a página recarregou) — retoma direto para
+    // finalizar a assinatura, sem passar pelo formulário de novo.
     if (kIsWeb) {
       final query = Uri.base.queryParameters;
       if (query.containsKey('setup_intent') && query.containsKey('redirect_status')) {
@@ -110,8 +105,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
     setState(() => _isLoading = false);
 
-    // busca os benefícios do plano em segundo plano — não atrasa o
-    // formulário aparecendo, só faz o card de benefícios surgir depois
     try {
       final result = await PlanoService.listarTodos();
       if (result['success'] == true) {
@@ -165,8 +158,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   void _mostrarErro(String msg) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: AppColors.primaryRed, behavior: SnackBarBehavior.floating),
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: AppColors.primaryRed,
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
@@ -185,7 +183,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     });
   }
 
-  // ---------------- Seleção do método: dispara setup-intent já ----------------
+  // ───────────── Seleção do método: dispara o setup-intent já ─────────────
 
   Future<void> _selecionarMetodo(MetodoPagamento metodo) async {
     setState(() => _metodoPagamento = metodo);
@@ -213,14 +211,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
   }
 
-  // ---------------- Submit único ----------------
+  // ──────────────────────────── Submit ────────────────────────────
 
   Future<void> _confirmar() async {
     if (!_formKey.currentState!.validate()) {
       _mostrarErro('Revise os campos destacados em vermelho');
       return;
     }
-
     if (_metodoPagamento == null) {
       _mostrarErro('Selecione a forma de pagamento');
       return;
@@ -294,7 +291,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
           if (_planoNome != null) 'planoNome': _planoNome!,
           if (_empresaId != null) 'empresaId': _empresaId!,
         });
-        await confirmWebSetupElement(returnUrl: Uri.base.toString());
+        // URL limpa: sem isso, voltar de um redirect anterior faz os
+        // parâmetros setup_intent/redirect_status se acumularem.
+        final returnUrl = Uri.base.replace(queryParameters: {}).toString();
+        await confirmWebSetupElement(returnUrl: returnUrl);
         _setupIntentIdConfirmado = _clientSecret!.split('_secret_').first;
         await _enviarAssinatura(setupIntentId: _setupIntentIdConfirmado);
       } catch (e) {
@@ -341,6 +341,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       final result = await PagamentoService.assinar(
         token: token,
         planoId: _planoId!,
+        intervalo: _intervalo,
         metodoPagamento: _metodoPagamento!.valorApi,
         paymentMethodId: paymentMethodId,
         setupIntentId: setupIntentId,
@@ -349,23 +350,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
       if (!mounted) return;
 
-      if (result['success'] == true) {
-        final data = result['data'] as Map<String, dynamic>?;
-        final urlFatura = data?['urlFatura']?.toString();
-
-        if (_metodoPagamento != MetodoPagamento.cartao && urlFatura != null) {
-          setState(() {
-            _isSubmitting = false;
-            _urlFatura = urlFatura;
-            _concluido = true;
-          });
-        } else {
-          _irParaProximaTela();
-        }
-      } else {
+      if (result['success'] != true) {
         setState(() => _isSubmitting = false);
-        _mostrarErro(result['message'] ?? 'Erro ao confirmar assinatura');
+        await _tratarErroAssinatura(result);
+        return;
       }
+
+      await _tratarResultado(result['resultado'] as ResultadoAssinatura);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
@@ -373,21 +364,246 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
   }
 
+  /// Os quatro estados.
+  ///
+  /// A versão anterior só distinguia "tem urlFatura ou não" e mandava o cartão
+  /// para /home mesmo com o 3DS pendente — o cliente saía achando que tinha
+  /// assinado, sem acesso e sem aviso.
+  Future<void> _tratarResultado(ResultadoAssinatura r) async {
+    // 1. Pago e liberado
+    if (r.liberado) {
+      _irParaProximaTela();
+      return;
+    }
+
+    // 2. Cartão precisa de 3DS
+    if (r.precisaConfirmarCartao) {
+      await _confirmarAcaoCartao(r);
+      return;
+    }
+
+    // 3. Pix/boleto aguardando compensação
+    if (r.aguardandoPagamento) {
+      setState(() => _isSubmitting = false);
+      await _abrirTelaAguardando(r);
+      return;
+    }
+
+    // 4. Estado inesperado — não manda o cliente adiante achando que pagou
+    setState(() => _isSubmitting = false);
+    _mostrarErro('Não foi possível concluir o pagamento. Tente novamente.');
+  }
+
+  /// Confirma o PaymentIntent da primeira fatura.
+  ///
+  /// NÃO é handleNextAction: com `payment_behavior: default_incomplete` o
+  /// Stripe cria o PaymentIntent em `requires_confirmation` e `next_action`
+  /// nulo — não há ação pendente a tratar, falta a CONFIRMAÇÃO. O
+  /// handleNextAction retorna sem fazer nada e a assinatura fica PENDENTE
+  /// para sempre.
+  ///
+  /// O payment method já está anexado ao intent pelo backend, então confirmar
+  /// pelo client secret basta. Se o emissor pedir 3DS, o desafio aparece aqui.
+  Future<void> _confirmarAcaoCartao(ResultadoAssinatura r) async {
+    try {
+      if (kIsWeb) {
+        await confirmWebPayment(clientSecret: r.clientSecret!);
+      } else {
+        await Stripe.instance.confirmPayment(
+          paymentIntentClientSecret: r.clientSecret!,
+        );
+      }
+
+      if (!mounted) return;
+      // Mesmo confirmado, quem ativa a assinatura é o webhook — pode levar
+      // alguns segundos. A tela de espera faz polling até virar ATIVA.
+      await _abrirTelaAguardando(r);
+    } on StripeException catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      _mostrarErro(e.error.localizedMessage ?? 'Não foi possível confirmar o cartão');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      _mostrarErro('Não foi possível confirmar o cartão: $e');
+    }
+  }
+
+  /// PAGAMENTO_EM_ABERTO não é erro de verdade: o cliente já tem uma cobrança
+  /// válida. O backend bloqueia qualquer método novo enquanto ela existir —
+  /// se deixasse passar, daria pra ficar com boleto e cartão abertos ao mesmo
+  /// tempo e pagar os dois.
+  Future<void> _tratarErroAssinatura(Map<String, dynamic> result) async {
+    if (result['codigo'] != 'PAGAMENTO_EM_ABERTO') {
+      _mostrarErro(result['message']?.toString() ?? 'Erro ao confirmar assinatura');
+      return;
+    }
+
+    final erro = result['erro'] as Map<String, dynamic>?;
+    final metodoPendente = MetodoPagamentoX.deApi(erro?['metodoPagamento']?.toString());
+
+    // Trocou de método: escolheu cartão e existe um boleto em aberto. Jogar
+    // direto na tela de boleto é confuso — ele não pediu isso e não entende
+    // por que caiu ali. Explica e deixa decidir.
+    if (metodoPendente != null && metodoPendente != _metodoPagamento) {
+      final escolha = await _perguntarSobrePendente(metodoPendente, erro);
+      if (escolha == null || escolha == _EscolhaPendente.voltar) return;
+
+      if (escolha == _EscolhaPendente.trocar) {
+        await _cancelarPendenteERepetir();
+        return;
+      }
+    }
+
+    await _abrirTelaAguardando(
+      ResultadoAssinatura(
+        assinaturaId: erro?['assinaturaId']?.toString() ?? '',
+        status: StatusAssinatura.pendente,
+        metodoPagamento: metodoPendente ?? _metodoPagamento,
+        urlFatura: erro?['urlFatura']?.toString(),
+        boleto: metodoPendente == MetodoPagamento.boleto
+            ? DadosBoleto(
+                pdfUrl: erro?['urlFatura']?.toString(),
+                vencimento: DateTime.tryParse(erro?['expiraEm']?.toString() ?? ''),
+              )
+            : null,
+      ),
+    );
+  }
+
+  Future<_EscolhaPendente?> _perguntarSobrePendente(
+    MetodoPagamento metodoPendente,
+    Map<String, dynamic>? erro,
+  ) {
+    final expira = DateTime.tryParse(erro?['expiraEm']?.toString() ?? '');
+    final nome = metodoPendente.label;
+    final novo = _metodoPagamento?.label ?? 'outro método';
+    final podeTrocar = metodoPendente != MetodoPagamento.boleto;
+
+    return showDialog<_EscolhaPendente>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Você já tem um $nome em aberto'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              podeTrocar
+                  ? 'Só é possível ter uma cobrança por vez. Você pode ver o '
+                      '$nome atual ou cancelá-lo para pagar com $novo.'
+                  : 'Boletos já emitidos não podem ser cancelados. Pague este '
+                      'boleto ou aguarde o vencimento para escolher outro método.',
+              style: const TextStyle(height: 1.4),
+            ),
+            if (expira != null) ...[
+              const SizedBox(height: 12),
+              Text('O $nome vence em ${_formatarData(expira)}.',
+                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            ],
+          ],
+        ),
+        actionsOverflowDirection: VerticalDirection.down,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, _EscolhaPendente.voltar),
+            child: const Text('Voltar', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, _EscolhaPendente.ver),
+            child: Text('Ver $nome', style: const TextStyle(color: AppColors.textSecondary)),
+          ),
+          // Boleto emitido não pode ser cancelado — é regra da rede, o
+          // documento está na praça. Oferecer o botão só pra ele falhar
+          // seria pior que não oferecer.
+          if (podeTrocar)
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, _EscolhaPendente.trocar),
+              child: Text('Cancelar e pagar com $novo',
+                  style: const TextStyle(
+                      color: AppColors.primaryRed, fontWeight: FontWeight.w600)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Cancela a cobrança pendente e refaz a assinatura com o método escolhido.
+  ///
+  /// Reaproveita o payment method que já foi coletado — o cliente não precisa
+  /// digitar o cartão de novo.
+  Future<void> _cancelarPendenteERepetir() async {
+    final token = await AuthStorage.getToken();
+    if (!mounted || token == null) return;
+
+    setState(() => _isSubmitting = true);
+
+    final res = await PagamentoService.cancelarPendente(
+      token: token,
+      empresaId: _empresaId,
+    );
+    if (!mounted) return;
+
+    if (res['success'] != true) {
+      setState(() => _isSubmitting = false);
+
+      // O dinheiro entrou entre o clique e o cancelamento. A assinatura vai
+      // ativar sozinha pelo webhook — mandar pra tela de espera é o certo.
+      if (res['codigo'] == 'BOLETO_NAO_CANCELAVEL') {
+        _mostrarErro(res['message']?.toString() ??
+            'Boletos emitidos não podem ser cancelados');
+        return;
+      }
+
+      if (res['codigo'] == 'PAGAMENTO_JA_CONFIRMADO') {
+        _mostrarErro('Seu pagamento anterior foi confirmado. Verificando...');
+        await _abrirTelaAguardando(ResultadoAssinatura(
+          assinaturaId: '',
+          status: StatusAssinatura.pendente,
+          metodoPagamento: _metodoPagamento,
+        ));
+        return;
+      }
+
+      _mostrarErro(res['message']?.toString() ?? 'Não foi possível cancelar a cobrança');
+      return;
+    }
+
+    await _enviarAssinatura(
+      paymentMethodId: _paymentMethodId,
+      setupIntentId: _setupIntentIdConfirmado,
+    );
+  }
+
+  String _formatarData(DateTime d) {
+    final dia = d.day.toString().padLeft(2, '0');
+    final mes = d.month.toString().padLeft(2, '0');
+    final hora = d.hour.toString().padLeft(2, '0');
+    final min = d.minute.toString().padLeft(2, '0');
+    return '$dia/$mes às $hora:$min';
+  }
+
+  Future<void> _abrirTelaAguardando(ResultadoAssinatura r) async {
+    final liberou = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AguardandoPagamentoScreen(resultado: r, empresaId: _empresaId),
+      ),
+    );
+    if (!mounted) return;
+    if (liberou == true) _irParaProximaTela();
+  }
+
   void _irParaProximaTela() {
     if (_empresaId != null) {
-      Navigator.pushReplacementNamed(context, '/empresa/funcionarios', arguments: {'empresaId': _empresaId});
+      Navigator.pushReplacementNamed(context, '/empresa/funcionarios',
+          arguments: {'empresaId': _empresaId});
     } else {
       Navigator.pushReplacementNamed(context, '/home');
     }
   }
 
-  Future<void> _abrirFatura() async {
-    if (_urlFatura == null) return;
-    final uri = Uri.parse(_urlFatura!);
-    if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
-
-  // ---------------- build ----------------
+  // ──────────────────────────── build ────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -395,15 +611,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Pagamento'),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primaryRed))
           : _errorMessage != null
               ? _buildErro()
-              : _concluido
-                  ? _buildConcluido()
-                  : _buildFormulario(),
+              : _buildFormulario(),
     );
   }
 
@@ -416,11 +633,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
           children: [
             const Icon(Icons.error_outline, color: AppColors.primaryRed, size: 48),
             const SizedBox(height: 16),
-            Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
+            Text(_errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textSecondary)),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
-                setState(() => _isLoading = true);
+                setState(() {
+                  _isLoading = true;
+                  _errorMessage = null;
+                });
                 _iniciar();
               },
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryRed),
@@ -459,9 +681,26 @@ class _PaymentScreenState extends State<PaymentScreen> {
           );
         }
 
+        // No mobile o card vai ACIMA do formulário. Antes ele só existia no
+        // desktop, então quem estava no celular decidia pagar sem ver o que
+        // estava comprando — justamente na tela mais decisiva do funil.
         return SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: Center(child: formWidget),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 500),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_plano != null) ...[
+                    _buildBeneficiosCard(),
+                    const SizedBox(height: 24),
+                  ],
+                  _buildFormContent(),
+                ],
+              ),
+            ),
+          ),
         );
       },
     );
@@ -489,13 +728,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text('Plano selecionado: $_planoNome',
-                        style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.primaryRed)),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, color: AppColors.primaryRed)),
                   ),
                 ],
               ),
             ),
           const Text('Dados de cobrança',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+              style: TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
           const SizedBox(height: 16),
           if (_empresaId == null) ...[
             TextFormField(
@@ -530,7 +771,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
               suffixIcon: _buscandoCep
                   ? const Padding(
                       padding: EdgeInsets.all(12),
-                      child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                      child: SizedBox(
+                          width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
                     )
                   : null,
             ),
@@ -539,7 +781,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
             onChanged: (v) {
               if (v.replaceAll(RegExp(r'\D'), '').length == 8) _buscarCep();
             },
-            validator: (v) => (v ?? '').replaceAll(RegExp(r'\D'), '').length != 8 ? 'CEP inválido' : null,
+            validator: (v) =>
+                (v ?? '').replaceAll(RegExp(r'\D'), '').length != 8 ? 'CEP inválido' : null,
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -553,7 +796,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
               Expanded(
                 child: TextFormField(
                   controller: _numeroController,
-                  decoration: const InputDecoration(labelText: 'Número', border: OutlineInputBorder()),
+                  decoration:
+                      const InputDecoration(labelText: 'Número', border: OutlineInputBorder()),
                   keyboardType: TextInputType.number,
                   validator: (v) => (v == null || v.isEmpty) ? 'Obrigatório' : null,
                 ),
@@ -563,7 +807,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 flex: 2,
                 child: TextFormField(
                   controller: _complementoController,
-                  decoration: const InputDecoration(labelText: 'Complemento (opcional)', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                      labelText: 'Complemento (opcional)', border: OutlineInputBorder()),
                 ),
               ),
             ],
@@ -582,7 +827,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 flex: 3,
                 child: TextFormField(
                   controller: _cidadeController,
-                  decoration: const InputDecoration(labelText: 'Cidade', border: OutlineInputBorder()),
+                  decoration:
+                      const InputDecoration(labelText: 'Cidade', border: OutlineInputBorder()),
                   validator: (v) => (v == null || v.isEmpty) ? 'Obrigatório' : null,
                 ),
               ),
@@ -591,10 +837,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 child: TextFormField(
                   controller: _estadoController,
                   decoration: const InputDecoration(
-                    labelText: 'UF',
-                    border: OutlineInputBorder(),
-                    counterText: '',
-                  ),
+                      labelText: 'UF', border: OutlineInputBorder(), counterText: ''),
                   maxLength: 2,
                   textCapitalization: TextCapitalization.characters,
                   inputFormatters: [UpperCaseTextFormatter()],
@@ -605,10 +848,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ),
           const SizedBox(height: 24),
           const Text('Forma de pagamento',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+              style: TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
           const SizedBox(height: 16),
           Row(
-            children: MetodoPagamento.values.map((m) {
+            children: _metodosDisponiveis.map((m) {
               final selecionado = _metodoPagamento == m;
               return Expanded(
                 child: Padding(
@@ -628,11 +872,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       ),
                       child: Column(
                         children: [
-                          Icon(m.icone, color: selecionado ? AppColors.primaryRed : AppColors.textSecondary),
+                          Icon(m.icone,
+                              color:
+                                  selecionado ? AppColors.primaryRed : AppColors.textSecondary),
                           const SizedBox(height: 8),
                           Text(m.label,
                               style: TextStyle(
-                                color: selecionado ? AppColors.primaryRed : AppColors.textSecondary,
+                                color:
+                                    selecionado ? AppColors.primaryRed : AppColors.textSecondary,
                                 fontWeight: selecionado ? FontWeight.w600 : FontWeight.normal,
                               )),
                         ],
@@ -646,9 +893,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
           const SizedBox(height: 16),
           if (_metodoPagamento == MetodoPagamento.cartao) _buildCartaoForm(),
           if (_metodoPagamento == MetodoPagamento.pix)
-            _buildAvisoPixBoleto('Depois de confirmar, você recebe um QR code PIX. O acesso libera assim que o pagamento cair.'),
+            _buildAviso('Depois de confirmar, você recebe o código PIX. '
+                'O acesso libera assim que o pagamento cair.'),
           if (_metodoPagamento == MetodoPagamento.boleto)
-            _buildAvisoPixBoleto('Depois de confirmar, você recebe um boleto. O acesso libera após a compensação — até 2 dias úteis.'),
+            _buildAviso('Depois de confirmar, você recebe o boleto. '
+                'O acesso libera após a compensação — até 2 dias úteis.'),
           const SizedBox(height: 32),
           SizedBox(
             width: double.infinity,
@@ -661,9 +910,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
               child: _isSubmitting
                   ? const SizedBox(
-                      height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                   : const Text('Confirmar assinatura',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
             ),
           ),
         ],
@@ -674,6 +926,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
   Widget _buildBeneficiosCard() {
     if (_plano == null) return const SizedBox.shrink();
 
+    final itens = BeneficiosPlano.itens(_plano!.chave);
+    final heranca = BeneficiosPlano.textoHeranca(_plano!.chave);
+
+    // Sem chave (plano gravado antes da coluna existir) o card não tem o que
+    // mostrar. Melhor sumir do que exibir um bloco vazio com título.
+    if (itens.isEmpty) return const SizedBox.shrink();
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -682,27 +941,37 @@ class _PaymentScreenState extends State<PaymentScreen> {
         border: Border.all(color: AppColors.divider),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Benefícios do plano',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-          ),
+          const Text('Benefícios do plano',
+              style: TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
           const SizedBox(height: 16),
+
+          // Vem do banco, não do texto fixo: se o limite mudar, o card
+          // acompanha sem deploy.
           _buildFeature(_plano!.limiteTexto),
-          _buildFeature('Chat com especialista'),
-          _buildFeature('Histórico completo'),
-          if (!_plano!.isFree) _buildFeature('Suporte prioritário'),
-          if (_plano!.isEmpresarial && _plano!.maxUsuarios != null)
-            _buildFeature('Até ${_plano!.maxUsuarios} usuários'),
-          if (_plano!.isEmpresarial) _buildFeature('Gerenciamento de equipe'),
+
+          if (heranca != null) ...[
+            const SizedBox(height: 4),
+            Text(heranca,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary)),
+            const SizedBox(height: 12),
+          ],
+
+          ...itens.map(_buildFeature),
+
+          if (_plano!.maxUsuarios != null)
+            _buildFeature(BeneficiosPlano.limiteUsuarios(_plano!.maxUsuarios!)),
         ],
       ),
     );
@@ -717,18 +986,30 @@ class _PaymentScreenState extends State<PaymentScreen> {
           const Icon(Icons.check_circle, color: AppColors.primaryRed, size: 20),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(texto, style: const TextStyle(color: AppColors.textSecondary, height: 1.4)),
-          ),
+              child: Text(texto,
+                  style: const TextStyle(color: AppColors.textSecondary, height: 1.4))),
         ],
       ),
     );
   }
 
   Widget _buildCartaoForm() {
+    // Antes: spinner infinito se o setup-intent falhasse. O snackbar aparecia
+    // e sumia, e o formulário ficava travado sem explicação.
     if (_clientSecret == null) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: Center(child: CircularProgressIndicator(color: AppColors.primaryRed)),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Column(
+          children: [
+            const CircularProgressIndicator(color: AppColors.primaryRed),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => _selecionarMetodo(MetodoPagamento.cartao),
+              child: const Text('Demorando? Toque para tentar de novo',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+            ),
+          ],
+        ),
       );
     }
     return Column(
@@ -738,7 +1019,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
           controller: _nomeCartaoController,
           textCapitalization: TextCapitalization.words,
           onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(labelText: 'Nome impresso no cartão', border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+              labelText: 'Nome impresso no cartão', border: OutlineInputBorder()),
         ),
         const SizedBox(height: 16),
         if (kIsWeb)
@@ -767,10 +1049,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
-  Widget _buildAvisoPixBoleto(String texto) {
+  Widget _buildAviso(String texto) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: AppColors.divider.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+          color: AppColors.divider.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(12)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -778,48 +1062,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
           const SizedBox(width: 12),
           Expanded(child: Text(texto, style: const TextStyle(color: AppColors.textSecondary))),
         ],
-      ),
-    );
-  }
-
-  Widget _buildConcluido() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.check_circle_outline, color: Color(0xFF388E3C), size: 56),
-            const SizedBox(height: 16),
-            Text(
-              _metodoPagamento == MetodoPagamento.pix
-                  ? 'Falta pagar o PIX pra ativar sua assinatura'
-                  : 'Falta pagar o boleto pra ativar sua assinatura',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: 24),
-            if (_urlFatura != null)
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _abrirFatura,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryRed,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: Text('Abrir ${_metodoPagamento == MetodoPagamento.pix ? "PIX" : "boleto"}',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                ),
-              ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: _irParaProximaTela,
-              child: const Text('Continuar depois', style: TextStyle(color: AppColors.textSecondary)),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -140,7 +140,7 @@ class AuthStorage {
     final role = await getUserRole();
     if (role != null) {
       final rUpper = role.trim().toUpperCase();
-      if (rUpper == 'ADMIN' || rUpper == 'EMPRESA_ADMIN' || rUpper == 'ADMIN_EMPRESA') {
+      if ( rUpper == 'EMPRESA_ADMIN' || rUpper == 'ADMIN_EMPRESA') {
         return true;
       }
     }
