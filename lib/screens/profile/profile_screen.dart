@@ -1006,7 +1006,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'AutoScan',
+                  'Autex',
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 4),
@@ -1023,7 +1023,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'O AutoScan é a plataforma completa para diagnósticos veiculares inteligentes, integração de inteligência artificial com códigos OBD2 e solicitação de esquemas elétricos automotivos.',
+                  'O Autex é a plataforma completa para diagnósticos veiculares inteligentes, integração de inteligência artificial com códigos OBD2 e solicitação de esquemas elétricos automotivos.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
                 ),
@@ -1035,7 +1035,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildSobreRecurso(Icons.support_agent_outlined, 'Suporte Técnico em Tempo Real'),
                 const SizedBox(height: 20),
                 const Text(
-                  '© 2026 AutoScan / Autex. Todos os direitos reservados.',
+                  '© 2026 Autex. Todos os direitos reservados.',
                   style: TextStyle(fontSize: 11, color: AppColors.textLight),
                   textAlign: TextAlign.center,
                 ),
