@@ -188,4 +188,44 @@ class PagamentoService {
       };
     }
   }
+  // ─────────────────────────── Renovação ───────────────────────────
+//
+// Adicionar ao PagamentoService (lib/services/payment/pagamento_service.dart),
+// junto dos outros métodos estáticos.
+
+  /// Renova a assinatura atual antes do vencimento.
+  ///
+  /// Plano e intervalo vêm da assinatura existente — o cliente está renovando
+  /// o que já tem. Só o método pode mudar: é assim que se troca de boleto
+  /// para cartão sem cancelar nada.
+  static Future<Map<String, dynamic>> renovar({
+    required String token,
+    required String metodoPagamento,
+    String? paymentMethodId,
+    String? setupIntentId,
+    String? empresaId,
+  }) async {
+    try {
+      final response = await ApiClient.post(
+        '/pagamentos/renovar',
+        token: token,
+        body: {
+          'metodoPagamento': metodoPagamento,
+          if (paymentMethodId != null) 'paymentMethodId': paymentMethodId,
+          if (setupIntentId != null) 'setupIntentId': setupIntentId,
+          if (empresaId != null) 'empresaId': empresaId,
+        },
+      );
+      loggerService.d('renovar → ${response.statusCode}');
+
+      if (_ok(response.statusCode)) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        return {'success': true, 'resultado': ResultadoAssinatura.deJson(json)};
+      }
+      return _erro(response.body);
+    } catch (e) {
+      loggerService.e('renovar erro: $e');
+      return {'success': false, 'message': 'Erro de conexão: $e'};
+    }
+  }
 }

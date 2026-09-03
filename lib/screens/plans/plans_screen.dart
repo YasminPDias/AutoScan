@@ -1,4 +1,4 @@
-import 'package:autex/screens/plans/beneficios_plano.dart';
+import 'package:autex/screens/payment/assinatura_store.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../layouts/desktop_layout.dart';
@@ -6,6 +6,7 @@ import '../../utils/responsive.dart';
 import '../../models/plano_model.dart';
 import '../../services/empresa/plano_service.dart';
 import '../../services/auth_storage.dart';
+import 'beneficios_plano.dart';
 
 class PlansScreen extends StatefulWidget {
   const PlansScreen({super.key});
@@ -19,7 +20,12 @@ class _PlansScreenState extends State<PlansScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   String? _planoSelecionadoId;
-  String? _assinaturaAtualNome; // nome do plano que o usuário já tem
+
+  /// Chave do plano que o usuário já assina.
+  ///
+  /// Comparação por CHAVE, não por nome: nome muda com marketing e o badge
+  /// "Atual" pararia de aparecer sem ninguém perceber.
+  String? _planoAtualChave;
 
   @override
   void initState() {
@@ -33,6 +39,11 @@ class _PlansScreenState extends State<PlansScreen> {
       _errorMessage = null;
     });
 
+    // O store é carregado no boot. Se ainda estiver vazio, carrega aqui —
+    // a tela de planos é justamente onde o cliente precisa ver o que já tem.
+    final store = AssinaturaStore.instancia;
+    if (store.atual == null) await store.carregar();
+
     final result = await PlanoService.listarTodos();
     if (!mounted) return;
 
@@ -41,7 +52,15 @@ class _PlansScreenState extends State<PlansScreen> {
       setState(() {
         _planos = planos;
         _isLoading = false;
-        if (planos.isNotEmpty) _planoSelecionadoId = planos.first.id;
+        _planoAtualChave = store.planoChave;
+
+        // Pré-seleciona o plano atual em vez do primeiro da lista: é o
+        // contexto em que o cliente está.
+        final atual = planos
+            .where((p) => p.chave != null && p.chave == _planoAtualChave)
+            .firstOrNull;
+        _planoSelecionadoId =
+            atual?.id ?? (planos.isNotEmpty ? planos.first.id : null);
       });
     } else {
       setState(() {
@@ -98,7 +117,9 @@ class _PlansScreenState extends State<PlansScreen> {
       child: Container(
         color: AppColors.background,
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: AppColors.primaryRed))
+            ? const Center(
+                child: CircularProgressIndicator(color: AppColors.primaryRed),
+              )
             : _errorMessage != null
                 ? _buildErro()
                 : SingleChildScrollView(
@@ -129,7 +150,9 @@ class _PlansScreenState extends State<PlansScreen> {
                           ),
                         ),
                         const SizedBox(height: 40),
-                        context.isDesktop ? _buildCardsDesktop() : _buildCardsMobile(),
+                        context.isDesktop
+                            ? _buildCardsDesktop()
+                            : _buildCardsMobile(),
                       ],
                     ),
                   ),
@@ -144,12 +167,15 @@ class _PlansScreenState extends State<PlansScreen> {
         children: [
           const Icon(Icons.error_outline, color: AppColors.primaryRed, size: 48),
           const SizedBox(height: 16),
-          Text(_errorMessage!, style: const TextStyle(color: AppColors.textSecondary)),
+          Text(_errorMessage!,
+              style: const TextStyle(color: AppColors.textSecondary)),
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: _carregar,
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryRed),
-            child: const Text('Tentar novamente', style: TextStyle(color: Colors.white)),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: AppColors.primaryRed),
+            child: const Text('Tentar novamente',
+                style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -157,9 +183,9 @@ class _PlansScreenState extends State<PlansScreen> {
   }
 
   Widget _buildCardsDesktop() {
-    // IntrinsicHeight: agora que cada plano tem um número diferente de
-    // benefícios, sem isto os cards ficam com alturas distintas e os botões
-    // desalinhados — o que atrapalha justamente a comparação.
+    // IntrinsicHeight: cada plano tem um número diferente de benefícios, e
+    // sem isto os cards ficam com alturas distintas e os botões desalinhados
+    // — o que atrapalha justamente a comparação.
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -168,7 +194,8 @@ class _PlansScreenState extends State<PlansScreen> {
           final isPopular = !plano.isFree && !plano.isEmpresarial;
           return Expanded(
             child: Padding(
-              padding: EdgeInsets.only(right: entry.key < _planos.length - 1 ? 20 : 0),
+              padding:
+                  EdgeInsets.only(right: entry.key < _planos.length - 1 ? 20 : 0),
               child: isPopular
                   ? Transform.scale(scale: 1.05, child: _buildCard(plano, isPopular))
                   : _buildCard(plano, isPopular),
@@ -185,7 +212,8 @@ class _PlansScreenState extends State<PlansScreen> {
         final plano = entry.value;
         final isPopular = !plano.isFree && !plano.isEmpresarial;
         return Padding(
-          padding: EdgeInsets.only(bottom: entry.key < _planos.length - 1 ? 16 : 0),
+          padding:
+              EdgeInsets.only(bottom: entry.key < _planos.length - 1 ? 16 : 0),
           child: _buildCard(plano, isPopular),
         );
       }).toList(),
@@ -194,7 +222,8 @@ class _PlansScreenState extends State<PlansScreen> {
 
   Widget _buildCard(PlanoModel plano, bool isPopular) {
     final isSelected = _planoSelecionadoId == plano.id;
-    final isAtual = _assinaturaAtualNome == plano.nome;
+    final isAtual =
+        _planoAtualChave != null && plano.chave == _planoAtualChave;
 
     return GestureDetector(
       onTap: () => _selecionarPlano(plano),
@@ -219,7 +248,6 @@ class _PlansScreenState extends State<PlansScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -241,9 +269,11 @@ class _PlansScreenState extends State<PlansScreen> {
                         if (isAtual) ...[
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: AppColors.primaryRed.withValues(alpha: 0.1),
+                              color:
+                                  AppColors.primaryRed.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Text(
@@ -274,7 +304,9 @@ class _PlansScreenState extends State<PlansScreen> {
                           const Padding(
                             padding: EdgeInsets.only(top: 8),
                             child: Text('/mês',
-                                style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    color: AppColors.textSecondary)),
                           ),
                       ],
                     ),
@@ -285,13 +317,13 @@ class _PlansScreenState extends State<PlansScreen> {
 
                     // itensCompletos, não `itens`: aqui os cards ficam lado a
                     // lado e o cliente compara. Com herança implícita ("Tudo
-                    // do Pro, mais:"), o PREMIUM pareceria ter MENOS que o
-                    // PRO — na tela de pagamento aquilo funciona porque a
-                    // escolha já foi feita.
-                    ...BeneficiosPlano.itensCompletos(plano.chave).map(_buildFeature),
+                    // do Pro, mais:"), o PREMIUM pareceria ter MENOS que o PRO.
+                    ...BeneficiosPlano.itensCompletos(plano.chave)
+                        .map(_buildFeature),
 
                     if (plano.maxUsuarios != null)
-                      _buildFeature(BeneficiosPlano.limiteUsuarios(plano.maxUsuarios!)),
+                      _buildFeature(
+                          BeneficiosPlano.limiteUsuarios(plano.maxUsuarios!)),
 
                     // Empurra o botão pro rodapé — com listas de tamanhos
                     // diferentes, os botões ficam alinhados entre os cards.
@@ -300,22 +332,37 @@ class _PlansScreenState extends State<PlansScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed:
-                            isSelected ? () => _assinar(plano) : () => _selecionarPlano(plano),
+                        // Desabilitado no plano atual. Antes ele chamava
+                        // _assinar() e o backend recusava com "Já existe uma
+                        // assinatura ativa" — erro sem informação nenhuma
+                        // para quem só queria conferir o que já tem.
+                        onPressed: isAtual
+                            ? null
+                            : isSelected
+                                ? () => _assinar(plano)
+                                : () => _selecionarPlano(plano),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isSelected ? AppColors.primaryRed : Colors.white,
-                          foregroundColor: isSelected ? Colors.white : AppColors.primaryRed,
+                          backgroundColor:
+                              isSelected ? AppColors.primaryRed : Colors.white,
+                          foregroundColor:
+                              isSelected ? Colors.white : AppColors.primaryRed,
+                          disabledBackgroundColor: AppColors.divider,
+                          disabledForegroundColor: AppColors.textSecondary,
                           side: BorderSide(
-                            color: AppColors.primaryRed,
+                            color: isAtual
+                                ? AppColors.divider
+                                : AppColors.primaryRed,
                             width: isSelected ? 0 : 2,
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            if (isSelected)
+                            if (isSelected && !isAtual)
                               const Padding(
                                 padding: EdgeInsets.only(right: 8),
                                 child: Icon(Icons.arrow_forward, size: 20),
@@ -331,7 +378,10 @@ class _PlansScreenState extends State<PlansScreen> {
                                                 ? 'Cadastrar empresa'
                                                 : 'Assinar agora'
                                         : 'Selecionar',
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ],
@@ -359,7 +409,8 @@ class _PlansScreenState extends State<PlansScreen> {
           Expanded(
             child: Text(
               texto,
-              style: const TextStyle(fontSize: 14, color: AppColors.textPrimary, height: 1.3),
+              style: const TextStyle(
+                  fontSize: 14, color: AppColors.textPrimary, height: 1.3),
             ),
           ),
         ],

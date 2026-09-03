@@ -8,6 +8,8 @@ import '../services/api_config.dart';
 import '../services/chat_read_tracker.dart';
 import '../services/socket_service.dart';
 import 'network_avatar_image.dart';
+import '../services/payment/recursos.dart';
+import '../widgets/recurso_visivel.dart';
 
 class AppSidebar extends StatefulWidget {
   final String currentRoute;
@@ -224,12 +226,15 @@ class _AppSidebarState extends State<AppSidebar> {
                   route: '/diagnostic',
                 ),
                 if (!_isAdminOrAssistente)
-                  _buildNavItem(
-                    context,
-                    icon: Icons.electrical_services_outlined,
-                    activeIcon: Icons.electrical_services,
-                    label: 'Esquema Elétrico',
-                    route: '/minhas-solicitacoes',
+                  RecursoVisivel(
+                    recurso: Recursos.esquemaEletrico,
+                    child: _buildNavItem(
+                      context,
+                      icon: Icons.electrical_services_outlined,
+                      activeIcon: Icons.electrical_services,
+                      label: 'Esquema Elétrico',
+                      route: '/minhas-solicitacoes',
+                    ),
                   ),
                 if (widget.currentRoute == '/chat')
                   _buildNavItem(

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:autex/screens/payment/assinatura_store.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'api_config.dart';
@@ -135,6 +136,7 @@ class AuthService {
       }
 
       loggerService.i('Login realizado com sucesso para: $userEmail');
+      await AssinaturaStore.instancia.carregar();
       return {
         'success': true,
         'token': token,

@@ -1,3 +1,4 @@
+import 'package:autex/screens/payment/assinatura_store.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../layouts/desktop_layout.dart';
@@ -5,10 +6,13 @@ import '../../utils/responsive.dart';
 import '../../services/auth_storage.dart';
 import '../../services/diagnostic_service.dart';
 import '../../services/logger_service.dart';
+import '../../widgets/aviso_renovacao.dart';
+import '../payment/renovacao_screen.dart';
+import '../../services/payment/recursos.dart';
+import '../../models/resultado_assinatura.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
-
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -25,6 +29,9 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadUserData();
     _carregarChamadosAbertos();
+    // O vencimento só é conhecido depois disto. Sem await de propósito: o
+    // aviso aparece quando os dados chegarem, via ValueListenableBuilder.
+    AssinaturaStore.instancia.carregar();
   }
 
   Future<void> _loadUserData() async {
@@ -40,12 +47,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _carregarChamadosAbertos() async {
     setState(() => _isLoadingChamados = true);
     _token = await AuthStorage.getToken();
-
     if (_token == null || _token!.isEmpty) {
       if (mounted) setState(() => _isLoadingChamados = false);
       return;
     }
-
     try {
       final res = await DiagnosticService.buscarMeusDiagnosticosAbertos(token: _token!);
       if (!mounted) return;
@@ -86,7 +91,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final diagnosticoId = item['id']?.toString();
     final conversa = item['conversa'] as Map<String, dynamic>?;
     final conversaId = conversa?['id']?.toString();
-
     if (conversaId != null && conversaId.isNotEmpty) {
       Navigator.pushNamed(context, '/chat', arguments: {'conversaId': conversaId});
     } else if (diagnosticoId != null && diagnosticoId.isNotEmpty) {
@@ -98,11 +102,31 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Aviso de vencimento próximo.
+  ///
+  /// Pix e boleto não renovam sozinhos: sem este aviso o cliente perde o
+  /// acesso na data e só descobre quando tenta usar. O widget se esconde
+  /// sozinho quando não há nada a avisar — inclusive no cartão recorrente,
+  /// que renova automático e onde avisar só geraria dúvida.
+  Widget _buildAvisoRenovacao() {
+    return AvisoRenovacao(
+      onRenovar: () async {
+        final renovou = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(builder: (_) => const RenovacaoScreen()),
+        );
+        if (renovou == true && mounted) {
+          // Recarrega para o aviso sumir sem precisar reabrir o app.
+          await AssinaturaStore.instancia.recarregar();
+        }
+      },
+    );
+  }
+
   Widget _buildStatusBadge(String status) {
     Color bg = const Color(0xFFFFF3E0);
     Color fg = const Color(0xFFE65100);
     String label = 'PENDENTE';
-
     switch (status.toUpperCase()) {
       case 'EM_ANALISE':
         bg = const Color(0xFFE3F2FD);
@@ -123,13 +147,12 @@ class _HomeScreenState extends State<HomeScreen> {
         label = status;
         break;
     }
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
       child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: fg)),
     );
-  }
+  } 
 
   Widget _buildChamadosAbertosSection(BuildContext context) {
     return Column(
@@ -236,10 +259,8 @@ class _HomeScreenState extends State<HomeScreen> {
               final ano = dados['anoVeiculo']?.toString() ?? '';
               final sintomas = dados['sintomas']?.toString() ?? 'Sem descrição de sintomas';
               final codObd = dados['codigoODB2']?.toString() ?? '';
-
               final tituloVeiculo = veiculo.isNotEmpty ? (ano.isNotEmpty ? '$veiculo ($ano)' : veiculo) : 'Veículo não informado';
               final isDesktop = context.isDesktop;
-
               return Card(
                 elevation: 0,
                 margin: EdgeInsets.zero,
@@ -404,99 +425,235 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildDesktopLayout(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(48),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [AppColors.primaryRed, Color(0xFFB71C1C)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: AppColors.primaryRed.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 8))],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+    final role = _userRole.trim().toUpperCase();
+    final ehEquipe = role == 'ADMIN' || role == 'ASSISTENTE';
+
+    return ValueListenableBuilder<StatusPagamento?>(
+      valueListenable: AssinaturaStore.instancia.status,
+      builder: (context, _, __) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(48),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.primaryRed, Color(0xFFB71C1C)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [BoxShadow(color: AppColors.primaryRed.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 8))],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 140, height: 140,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
-                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4))],
-                    ),
-                    child: const Icon(Icons.directions_car_rounded, size: 70, color: Colors.white),
-                  ),
-                  const SizedBox(width: 32),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _welcomeTitle,
-                          style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: -0.5),
+                  Row(
+                    children: [
+                      Container(
+                        width: 140, height: 140,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
+                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4))],
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Sistema Profissional de Diagnóstico Automotivo',
-                          style: TextStyle(fontSize: 18, color: Colors.white.withValues(alpha: 0.95), fontWeight: FontWeight.w400),
-                        ),
-                        const SizedBox(height: 20),
-                        Row(
+                        child: const Icon(Icons.directions_car_rounded, size: 70, color: Colors.white),
+                      ),
+                      const SizedBox(width: 32),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildStatBadge('1000+', 'Diagnósticos'),
-                            const SizedBox(width: 24),
-                            _buildStatBadge('24/7', 'Suporte'),
-                            const SizedBox(width: 24),
-                            _buildStatBadge('IA', 'Avançada'),
+                            Text(
+                              _welcomeTitle,
+                              style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: -0.5),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Sistema Profissional de Diagnóstico Automotivo',
+                              style: TextStyle(fontSize: 18, color: Colors.white.withValues(alpha: 0.95), fontWeight: FontWeight.w400),
+                            ),
+                            const SizedBox(height: 20),
+                            Row(
+                              children: [
+                                _buildStatBadge('1000+', 'Diagnósticos'),
+                                const SizedBox(width: 24),
+                                _buildStatBadge('24/7', 'Suporte'),
+                                const SizedBox(width: 24),
+                                _buildStatBadge('IA', 'Avançada'),
+                              ],
+                            ),
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 32),
-        _buildChamadosAbertosSection(context),
-        const SizedBox(height: 40),
-        Row(
-          children: [
-            Container(width: 4, height: 24, decoration: BoxDecoration(color: AppColors.primaryRed, borderRadius: BorderRadius.circular(2))),
-            const SizedBox(width: 12),
-            const Text('Recursos Principais', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+            ),
+            const SizedBox(height: 24),
+            _buildAvisoRenovacao(),
+            const SizedBox(height: 8),
+            _buildChamadosAbertosSection(context),
+            const SizedBox(height: 40),
+            Row(
+              children: [
+                Container(width: 4, height: 24, decoration: BoxDecoration(color: AppColors.primaryRed, borderRadius: BorderRadius.circular(2))),
+                const SizedBox(width: 12),
+                const Text('Recursos Principais', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+              ],
+            ),
+            const SizedBox(height: 28),
+            GridView.count(
+              crossAxisCount: 3,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: 3.4,
+              children: [
+                _buildEnhancedFeatureCard(icon: Icons.analytics_outlined, title: 'Diagnóstico Inteligente', description: 'Análise completa e precisa do seu veículo', color: AppColors.primaryRed, onTap: () => Navigator.pushNamed(context, '/diagnostic')),
+                if (ehEquipe || Recursos.libera(Recursos.esquemaEletrico))
+                  _buildEnhancedFeatureCard(icon: Icons.electrical_services_outlined, title: 'Suporte a Esquema Elétrico', description: 'Solicite diagramas ou suporte para esquema elétrico', color: const Color(0xFFFF8F00), onTap: () => _abrirSuporteEsquema(context)),
+                _buildEnhancedFeatureCard(icon: Icons.description_outlined, title: 'Planos e Assinaturas', description: 'Conheça nossos planos', color: const Color(0xFF388E3C), onTap: () => Navigator.pushNamed(context, '/plans')),
+                _buildEnhancedFeatureCard(icon: Icons.history, title: 'Histórico Completo', description: 'Acesse todos os diagnósticos', color: const Color(0xFFE64A19), onTap: () => Navigator.pushNamed(context, '/history')),
+                if (_userRole.trim().toUpperCase() == 'ADMIN') ...[
+                  _buildEnhancedFeatureCard(
+                    icon: Icons.trending_up,
+                    title: 'Relatórios Detalhados',
+                    description: 'Análises e estatísticas',
+                    color: const Color(0xFF00796B),
+                    onTap: () => Navigator.pushNamed(context, '/admin/users'),
+                  ),
+                  _buildEnhancedFeatureCard(
+                    icon: Icons.manage_accounts_outlined,
+                    title: 'Gestão do Sistema',
+                    description: 'Painel administrativo',
+                    color: const Color(0xFFE53935),
+                    onTap: () => Navigator.pushNamed(context, '/admin/users'),
+                  ),
+                ],
+              ],
+            ),
           ],
-        ),
-        const SizedBox(height: 28),
-        GridView.count(
-          crossAxisCount: 3,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          childAspectRatio: 3.4,
+        );
+      },
+    );
+  }
+
+  Widget _buildMobileLayout(BuildContext context) {
+    final role = _userRole.trim().toUpperCase();
+    final isAdmin = role == 'ADMIN';
+    final isAssistente = role == 'ASSISTENTE';
+    final isAdminEmpresa = role == 'ADMIN_EMPRESA';
+    final ehEquipe = isAdmin || isAssistente;
+
+    return ValueListenableBuilder<StatusPagamento?>(
+      valueListenable: AssinaturaStore.instancia.status,
+      builder: (context, _, __) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildEnhancedFeatureCard(icon: Icons.analytics_outlined, title: 'Diagnóstico Inteligente', description: 'Análise completa e precisa do seu veículo', color: AppColors.primaryRed, onTap: () => Navigator.pushNamed(context, '/diagnostic')),
-            _buildEnhancedFeatureCard(icon: Icons.electrical_services_outlined, title: 'Suporte a Esquema Elétrico', description: 'Solicite diagramas ou suporte para esquema elétrico', color: const Color(0xFFFF8F00), onTap: () => _abrirSuporteEsquema(context)),
-            _buildEnhancedFeatureCard(icon: Icons.description_outlined, title: 'Planos e Assinaturas', description: 'Conheça nossos planos', color: const Color(0xFF388E3C), onTap: () => Navigator.pushNamed(context, '/plans')),
-            _buildEnhancedFeatureCard(icon: Icons.history, title: 'Histórico Completo', description: 'Acesse todos os diagnósticos', color: const Color(0xFFE64A19), onTap: () => Navigator.pushNamed(context, '/history')),
-            if (_userRole.trim().toUpperCase() == 'ADMIN') ...[
-              _buildEnhancedFeatureCard(
-                icon: Icons.trending_up,
-                title: 'Relatórios Detalhados',
-                description: 'Análises e estatísticas',
-                color: const Color(0xFF00796B),
-                onTap: () => Navigator.pushNamed(context, '/admin/users'),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+              decoration: BoxDecoration(color: AppColors.primaryRed, borderRadius: BorderRadius.circular(16)),
+              child: Column(
+                children: [
+                  Container(
+                    width: 80, height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 2),
+                    ),
+                    child: const Icon(Icons.directions_car, size: 48, color: Colors.white),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    _welcomeTitle,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Sistema Profissional de Diagnóstico Automotivo',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: Colors.white),
+                  ),
+                ],
               ),
+            ),
+            const SizedBox(height: 16),
+            _buildAvisoRenovacao(),
+            const SizedBox(height: 8),
+            _buildChamadosAbertosSection(context),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Container(width: 4, height: 20, decoration: BoxDecoration(color: AppColors.primaryRed, borderRadius: BorderRadius.circular(2))),
+                const SizedBox(width: 10),
+                const Text('Recursos Principais', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildEnhancedFeatureCard(
+              icon: Icons.analytics_outlined,
+              title: 'Diagnóstico Inteligente',
+              description: 'Análise completa e precisa do seu veículo com tecnologia avançada',
+              color: AppColors.primaryRed,
+              onTap: () => Navigator.pushNamed(context, '/diagnostic'),
+            ),
+            if (ehEquipe || Recursos.libera(Recursos.esquemaEletrico)) ...[
+              const SizedBox(height: 12),
+              _buildEnhancedFeatureCard(
+                icon: Icons.electrical_services_outlined,
+                title: 'Suporte a Esquema Elétrico',
+                description: 'Solicite o diagrama ou suporte técnico',
+                color: const Color(0xFFFF8F00),
+                onTap: () => _abrirSuporteEsquema(context),
+              ),
+            ],
+            const SizedBox(height: 12),
+            _buildEnhancedFeatureCard(
+              icon: Icons.history,
+              title: 'Histórico Completo',
+              description: 'Acesse todos os diagnósticos',
+              color: const Color(0xFFE64A19),
+              onTap: () => Navigator.pushNamed(context, '/history'),
+            ),
+            const SizedBox(height: 12),
+            _buildEnhancedFeatureCard(
+              icon: Icons.description_outlined,
+              title: 'Planos e Assinaturas',
+              description: 'Conheça nossos planos',
+              color: const Color(0xFF388E3C),
+              onTap: () => Navigator.pushNamed(context, '/plans'),
+            ),
+            if (isAdmin || isAssistente) ...[
+              const SizedBox(height: 12),
+              _buildEnhancedFeatureCard(
+                icon: Icons.support_agent_outlined,
+                title: 'Atendimentos',
+                description: 'Gerenciar chamados em aberto',
+                color: const Color(0xFF1976D2),
+                onTap: () => Navigator.pushNamed(context, '/chat-history'),
+              ),
+            ],
+            if (isAdminEmpresa) ...[
+              const SizedBox(height: 12),
+              _buildEnhancedFeatureCard(
+                icon: Icons.business_outlined,
+                title: 'Minha Empresa',
+                description: 'Gerenciar funcionários e dados',
+                color: const Color(0xFF7B1FA2),
+                onTap: () => Navigator.pushNamed(context, '/empresa/funcionarios'),
+              ),
+            ],
+            if (isAdmin) ...[
+              const SizedBox(height: 12),
               _buildEnhancedFeatureCard(
                 icon: Icons.manage_accounts_outlined,
                 title: 'Gestão do Sistema',
@@ -506,123 +663,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMobileLayout(BuildContext context) {
-    final role = _userRole.trim().toUpperCase();
-    final isAdmin = role == 'ADMIN';
-    final isAssistente = role == 'ASSISTENTE';
-    final isAdminEmpresa = role == 'ADMIN_EMPRESA';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
-          decoration: BoxDecoration(color: AppColors.primaryRed, borderRadius: BorderRadius.circular(16)),
-          child: Column(
-            children: [
-              Container(
-                width: 80, height: 80,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 2),
-                ),
-                child: const Icon(Icons.directions_car, size: 48, color: Colors.white),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                _welcomeTitle,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Sistema Profissional de Diagnóstico Automotivo',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.white),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        _buildChamadosAbertosSection(context),
-        const SizedBox(height: 24),
-        Row(
-          children: [
-            Container(width: 4, height: 20, decoration: BoxDecoration(color: AppColors.primaryRed, borderRadius: BorderRadius.circular(2))),
-            const SizedBox(width: 10),
-            const Text('Recursos Principais', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-          ],
-        ),
-        const SizedBox(height: 16),
-        _buildEnhancedFeatureCard(
-          icon: Icons.analytics_outlined,
-          title: 'Diagnóstico Inteligente',
-          description: 'Análise completa e precisa do seu veículo com tecnologia avançada',
-          color: AppColors.primaryRed,
-          onTap: () => Navigator.pushNamed(context, '/diagnostic'),
-        ),
-        const SizedBox(height: 12),
-        _buildEnhancedFeatureCard(
-          icon: Icons.electrical_services_outlined,
-          title: 'Suporte a Esquema Elétrico',
-          description: 'Solicite o diagrama ou suporte técnico',
-          color: const Color(0xFFFF8F00),
-          onTap: () => _abrirSuporteEsquema(context),
-        ),
-        const SizedBox(height: 12),
-        _buildEnhancedFeatureCard(
-          icon: Icons.history,
-          title: 'Histórico Completo',
-          description: 'Acesse todos os diagnósticos',
-          color: const Color(0xFFE64A19),
-          onTap: () => Navigator.pushNamed(context, '/history'),
-        ),
-        const SizedBox(height: 12),
-        _buildEnhancedFeatureCard(
-          icon: Icons.description_outlined,
-          title: 'Planos e Assinaturas',
-          description: 'Conheça nossos planos',
-          color: const Color(0xFF388E3C),
-          onTap: () => Navigator.pushNamed(context, '/plans'),
-        ),
-        if (isAdmin || isAssistente) ...[
-          const SizedBox(height: 12),
-          _buildEnhancedFeatureCard(
-            icon: Icons.support_agent_outlined,
-            title: 'Atendimentos',
-            description: 'Gerenciar chamados em aberto',
-            color: const Color(0xFF1976D2),
-            onTap: () => Navigator.pushNamed(context, '/chat-history'),
-          ),
-        ],
-        if (isAdminEmpresa) ...[
-          const SizedBox(height: 12),
-          _buildEnhancedFeatureCard(
-            icon: Icons.business_outlined,
-            title: 'Minha Empresa',
-            description: 'Gerenciar funcionários e dados',
-            color: const Color(0xFF7B1FA2),
-            onTap: () => Navigator.pushNamed(context, '/empresa/funcionarios'),
-          ),
-        ],
-        if (isAdmin) ...[
-          const SizedBox(height: 12),
-          _buildEnhancedFeatureCard(
-            icon: Icons.manage_accounts_outlined,
-            title: 'Gestão do Sistema',
-            description: 'Painel administrativo',
-            color: const Color(0xFFE53935),
-            onTap: () => Navigator.pushNamed(context, '/admin/users'),
-          ),
-        ],
-      ],
+        );
+      },
     );
   }
 

@@ -1,10 +1,7 @@
-
 import 'package:autex/models/resultado_assinatura.dart';
-
 import 'package:autex/screens/payment/aguardando_payment_screen.dart';
-
-import 'package:autex/screens/payment/stripe_web_impl.dart';
 import 'package:autex/screens/plans/beneficios_plano.dart';
+import 'package:autex/screens/payment/stripe_web.dart';
 import 'package:autex/services/empresa/plano_service.dart';
 import 'package:autex/services/payment/cobranca_utils.dart';
 import 'package:autex/services/payment/pagamento_service.dart';
@@ -286,15 +283,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
     if (kIsWeb) {
       try {
-        salvarContextoRedirect({
-          'planoId': _planoId!,
-          if (_planoNome != null) 'planoNome': _planoNome!,
-          if (_empresaId != null) 'empresaId': _empresaId!,
-        });
-        // URL limpa: sem isso, voltar de um redirect anterior faz os
-        // parâmetros setup_intent/redirect_status se acumularem.
-        final returnUrl = Uri.base.replace(queryParameters: {}).toString();
-        await confirmWebSetupElement(returnUrl: returnUrl);
+        // Com CardField não há redirect: o 3DS do SetupIntent resolve em
+        // modal sobre a página. Por isso sumiram o salvarContextoRedirect e
+        // o returnUrl — o estado da tela nunca se perde.
+        await confirmWebSetupIntent(clientSecret: _clientSecret!);
         _setupIntentIdConfirmado = _clientSecret!.split('_secret_').first;
         await _enviarAssinatura(setupIntentId: _setupIntentIdConfirmado);
       } catch (e) {
@@ -394,41 +386,77 @@ class _PaymentScreenState extends State<PaymentScreen> {
     _mostrarErro('Não foi possível concluir o pagamento. Tente novamente.');
   }
 
-  /// Confirma o PaymentIntent da primeira fatura.
+  /// Confirma o pagamento e apresenta o 3DS quando o emissor pedir.
   ///
-  /// NÃO é handleNextAction: com `payment_behavior: default_incomplete` o
-  /// Stripe cria o PaymentIntent em `requires_confirmation` e `next_action`
-  /// nulo — não há ação pendente a tratar, falta a CONFIRMAÇÃO. O
-  /// handleNextAction retorna sem fazer nada e a assinatura fica PENDENTE
-  /// para sempre.
+  /// É confirmPayment, NÃO handleNextAction. O Stripe distingue dois modos:
   ///
-  /// O payment method já está anexado ao intent pelo backend, então confirmar
-  /// pelo client secret basta. Se o emissor pedir 3DS, o desafio aparece aqui.
-  Future<void> _confirmarAcaoCartao(ResultadoAssinatura r) async {
-    try {
-      if (kIsWeb) {
-        await confirmWebPayment(clientSecret: r.clientSecret!);
-      } else {
-        await Stripe.instance.confirmPayment(
-          paymentIntentClientSecret: r.clientSecret!,
-        );
-      }
-
-      if (!mounted) return;
-      // Mesmo confirmado, quem ativa a assinatura é o webhook — pode levar
-      // alguns segundos. A tela de espera faz polling até virar ATIVA.
-      await _abrirTelaAguardando(r);
-    } on StripeException catch (e) {
-      if (!mounted) return;
-      setState(() => _isSubmitting = false);
-      _mostrarErro(e.error.localizedMessage ?? 'Não foi possível confirmar o cartão');
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isSubmitting = false);
-      _mostrarErro('Não foi possível confirmar o cartão: $e');
+  ///   confirmation_method 'manual'    → servidor confirma, cliente só trata
+  ///                                     a ação: handleNextAction
+  ///   confirmation_method 'automatic' → cliente confirma E trata a ação numa
+  ///                                     chamada só: confirmPayment
+  ///
+  /// A subscription cria o intent como 'automatic', e não dá para mudar isso
+  /// depois. Por isso o handleNextAction recusava com "does not require manual
+  /// server-side confirmation".
+  ///
+  /// O payment method já está anexado ao intent, então confirmar pelo client
+  /// secret basta — sem reenviar dados do cartão.
+Future<void> _confirmarAcaoCartao(ResultadoAssinatura r) async {
+  try {
+    if (kIsWeb) {
+      await confirmWebPayment(clientSecret: r.clientSecret!);
+    } else {
+      await Stripe.instance.confirmPayment(
+        paymentIntentClientSecret: r.clientSecret!,
+      );
     }
+
+    if (!mounted) return;
+
+    // Cartão confirma na hora — diferente de boleto, não há o que aguardar.
+    // Mas quem grava ATIVA no banco é o webhook, que leva alguns segundos.
+    // Então: consulta o status por alguns ciclos antes de seguir.
+    await _aguardarAtivacao();
+  } on StripeException catch (e) {
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+    _mostrarErro(e.error.localizedMessage ?? 'Não foi possível confirmar o cartão');
+  } catch (e) {
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+    _mostrarErro('Não foi possível confirmar o cartão: $e');
+  }
+}
+
+/// Espera o webhook ativar a assinatura, mantendo o spinner do botão.
+///
+/// Não abre a tela de "falta pagar": ela é para boleto, e mostrar isso a
+/// quem acabou de passar o cartão confunde.
+Future<void> _aguardarAtivacao() async {
+  final token = await AuthStorage.getToken();
+  if (!mounted || token == null) return;
+
+  for (var tentativa = 0; tentativa < 10; tentativa++) {
+    final res = await PagamentoService.consultarStatus(
+      token: token,
+      empresaId: _empresaId,
+    );
+    if (!mounted) return;
+
+    if (res['success'] == true) {
+      final status = res['status'] as StatusPagamento;
+      if (status.temAcesso) {
+        _irParaProximaTela();
+        return;
+      }
+    }
+    await Future.delayed(const Duration(seconds: 2));
   }
 
+  // 20s sem confirmar: o pagamento provavelmente entrou, mas o webhook
+  // atrasou. Segue adiante — o guard nega se não tiver ativado mesmo.
+  if (mounted) _irParaProximaTela();
+}
   /// PAGAMENTO_EM_ABERTO não é erro de verdade: o cliente já tem uma cobrança
   /// válida. O backend bloqueia qualquer método novo enquanto ela existir —
   /// se deixasse passar, daria pra ficar com boleto e cartão abertos ao mesmo
@@ -1030,6 +1058,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
           )
         else
           CardFormField(
+            // Sem isto o seletor vem "United States" por padrão.
+            countryCode: 'BR',
             controller: _cardFormController,
             enablePostalCode: false,
             style: CardFormStyle(

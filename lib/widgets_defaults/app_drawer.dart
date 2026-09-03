@@ -7,6 +7,8 @@ import '../services/auth_service.dart';
 import '../services/api_config.dart';
 import '../services/chat_read_tracker.dart';
 import 'network_avatar_image.dart';
+import '../services/payment/recursos.dart';
+import '../widgets/recurso_visivel.dart';
 
 class AppDrawer extends StatefulWidget {
   final String? currentRoute;
@@ -251,13 +253,16 @@ class _AppDrawerState extends State<AppDrawer> {
                   },
                 ),
                 if (!_isAdminOrAssistente)
-                  ListTile(
-                    leading: const Icon(Icons.electrical_services_outlined),
-                    title: const Text('Esquema Elétrico'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushReplacementNamed(context, '/minhas-solicitacoes');
-                    },
+                  RecursoVisivel(
+                    recurso: Recursos.esquemaEletrico,
+                    child: ListTile(
+                      leading: const Icon(Icons.electrical_services_outlined),
+                      title: const Text('Esquema Elétrico'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.pushReplacementNamed(context, '/minhas-solicitacoes');
+                      },
+                    ),
                   ),
                 if (widget.currentRoute == '/chat')
                   ListTile(

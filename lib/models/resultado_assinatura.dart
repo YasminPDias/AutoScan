@@ -151,6 +151,7 @@ class StatusPagamento {
   final String? assinaturaId;
   final StatusAssinatura status;
   final bool temAcesso;
+  final String? planoChave;          // ← novo
   final MetodoPagamento? metodoPagamento;
   final DateTime? proximoVencimento;
   final bool cancelamentoAgendado;
@@ -160,6 +161,7 @@ class StatusPagamento {
     this.assinaturaId,
     required this.status,
     required this.temAcesso,
+    this.planoChave,                 // ← novo
     this.metodoPagamento,
     this.proximoVencimento,
     this.cancelamentoAgendado = false,
@@ -171,10 +173,11 @@ class StatusPagamento {
       assinaturaId: j['assinaturaId']?.toString(),
       status: StatusAssinaturaX.deApi(j['status']?.toString()),
       temAcesso: j['temAcesso'] == true,
+      planoChave: j['planoChave']?.toString(),        // ← novo
       metodoPagamento: MetodoPagamentoX.deApi(j['metodoPagamento']?.toString()),
       proximoVencimento: DateTime.tryParse(j['proximoVencimento']?.toString() ?? ''),
       cancelamentoAgendado: j['cancelamentoAgendado'] == true,
       urlFatura: j['urlFatura']?.toString(),
     );
   }
-} 
+}

@@ -1,9 +1,18 @@
 import 'dart:convert';
 import 'package:flutter/widgets.dart';
-import 'package:flutter_stripe/flutter_stripe.dart' show CardFieldInputDetails;
+import 'package:flutter_stripe/flutter_stripe.dart' show CardField, CardFieldInputDetails;
 import 'package:flutter_stripe_web/flutter_stripe_web.dart';
 import 'package:web/web.dart' as web;
 
+/// CardField em vez de PaymentElement.
+///
+/// O CardField confirma via `confirmCardSetup` (API antiga, específica de
+/// cartão), que resolve o 3DS em modal sobre a página. O PaymentElement usa
+/// a API genérica e herda o modelo de redirect mesmo quando cartão não
+/// precisaria.
+///
+/// Custo: campos numa linha só (número, validade e CVC juntos), em vez de
+/// separados.
 class WebPaymentElement extends StatelessWidget {
   const WebPaymentElement({
     super.key,
@@ -16,33 +25,39 @@ class WebPaymentElement extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PaymentElement(
-      clientSecret: clientSecret,
+    return CardField(
       enablePostalCode: false,
       onCardChanged: onCardChanged,
     );
   }
 }
 
-Future<void> confirmWebSetupElement({required String returnUrl}) {
-  return WebStripe.instance.confirmSetupElement(
-    ConfirmSetupElementOptions(
-      confirmParams: ConfirmSetupParams(return_url: returnUrl),
-      redirect: SetupConfirmationRedirect.ifRequired,
-    ),
+/// Confirma o SetupIntent (coleta do cartão) sobre o CardField montado.
+///
+/// Recebe o clientSecret porque o CardField, diferente do PaymentElement,
+/// não guarda o intent internamente — ele é só o campo de entrada.
+Future<void> confirmWebSetupIntent({required String clientSecret}) {
+  return WebStripe.instance.confirmSetupIntent(
+    clientSecret,
+    const PaymentMethodParams.card(paymentMethodData: PaymentMethodData()),
+    null,
+  );
+}
+/// Confirma o PaymentIntent da primeira fatura da assinatura.
+///
+/// ⚠️ ESTE É O PONTO EM DÚVIDA. O CardField coletou o cartão para o
+/// SetupIntent; aqui precisamos confirmar OUTRO intent (o pi_ criado pela
+/// subscription). Se o SDK amarrar o campo ao primeiro intent, isto falha
+/// com "client_secret associated with a SetupIntent" — o mesmo erro do
+/// PaymentElement, e a opção C não resolve.
+Future<void> confirmWebPayment({required String clientSecret}) {
+  return WebStripe.instance.confirmPayment(
+    clientSecret,
+    const PaymentMethodParams.card(paymentMethodData: PaymentMethodData()),
   );
 }
 
-/// Confirma o PaymentIntent da primeira fatura da assinatura.
-///
-/// Com `payment_behavior: default_incomplete` o intent nasce em
-/// `requires_confirmation` — precisa ser confirmado, não é caso de
-/// handleNextAction. O payment method já vem anexado pelo backend.
-Future<void> confirmWebPayment({required String clientSecret}) {
-  return WebStripe.instance.handleNextAction(clientSecret);
-}
-
-// Sobrevive ao reload que o redirect de 3DS causa (mesma aba), some
+// Sobrevive ao reload que um eventual redirect cause (mesma aba), some
 // sozinho quando a aba fecha — não deixa contexto de pagamento pendente
 // acumulando indefinidamente.
 void salvarContextoRedirect(Map<String, String> dados) {

@@ -9,15 +9,19 @@ class WebPaymentElement extends StatelessWidget {
   });
 
   final String clientSecret;
-  final void Function(CardFieldInputDetails?) onCardChanged; 
+  final void Function(CardFieldInputDetails?) onCardChanged;
 
   @override
   Widget build(BuildContext context) =>
       throw UnsupportedError('WebPaymentElement só roda em Flutter web');
 }
 
-Future<void> confirmWebSetupElement({required String returnUrl}) {
-  throw UnsupportedError('confirmWebSetupElement só roda em Flutter web');
+Future<void> confirmWebSetupIntent({required String clientSecret}) {
+  throw UnsupportedError('confirmWebSetupIntent só roda em Flutter web');
+}
+
+Future<void> confirmWebPayment({required String clientSecret}) {
+  throw UnsupportedError('confirmWebPayment só roda em Flutter web');
 }
 
 void salvarContextoRedirect(Map<String, String> dados) {
